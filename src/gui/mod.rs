@@ -24,24 +24,14 @@ pub fn build_ui(app: &Application) {
 
     let text_view = EditorWidget::new();
 
-    let editor_card = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
-    editor_card.set_css_classes(&["editor-card"]);
-    
-    let editor_padding = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
-    editor_padding.set_margin_start(32);
-    editor_padding.set_margin_end(32);
-    editor_padding.set_margin_top(32);
-    editor_padding.set_margin_bottom(32);
-    
-    editor_padding.append(&text_view);
-    editor_card.append(&editor_padding);
-
     let scrolled_window = gtk4::ScrolledWindow::builder()
         .hscrollbar_policy(gtk4::PolicyType::Never)
         .vscrollbar_policy(gtk4::PolicyType::Automatic)
-        .child(&editor_card)
+        .child(&text_view)
         .build();
 
+    text_view.set_css_classes(&["editor"]);
+    
     preview_container.append(&scrolled_window);
 
     main_paned.set_start_child(Some(&sidebar_container));

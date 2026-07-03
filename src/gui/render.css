@@ -23,16 +23,8 @@ text {
 }
 
 /* Сама карточка редактора справа — теперь граница СТРОГО ОДНА */
-.editor-card {
-    background-color: #1f1f2e !important; 
-    border: 1px solid #333344 !important; 
-    border-radius: 8px !important;
-    
-    /* ОТСТУПЫ: Просто делаем отступы по 30 пикселей со всех сторон карточки */
-    margin: 30px !important; 
-
-    /* Внутренние отступы для текста внутри карточки */
-    padding: 32px !important; 
+.editor {
+    margin: 32px;
 }
 
 /* Текст внутри карточки */
