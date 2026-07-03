@@ -13,11 +13,11 @@ pub fn build(state: &EditorState) -> Vec<VisualLine> {
     let theme = state.get_theme();
 
     state
-        .text
-        .lines()
+        .lines
+        .iter()
         .enumerate()
         .map(|(i, line)| VisualLine {
-            text: line.to_string(),
+            text: line.clone(),
             font_size: theme.text.size,
             font_family: theme.text.font_family.clone(),
             x: theme.padding,
