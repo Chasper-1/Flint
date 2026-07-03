@@ -38,23 +38,44 @@ impl EditorWidget {
                 return;
             }
 
+            // --- Отрисовка фона и рамки (восстановлено) ---
+            // Заливка фона
+            if let Some((r, g, b, a)) = hex_to_rgba(&theme.background) {
+                cr.set_source_rgba(r, g, b, a);
+                rounded_rect(cr, padding, padding, w, h, theme.radius as f64);
+                cr.fill().unwrap();
+            }
+
+            // Рамка
+            if let Some((r, g, b, a)) = hex_to_rgba(&theme.border_color) {
+                cr.set_source_rgba(r, g, b, a);
+                cr.set_line_width(theme.border_width as f64);
+                rounded_rect(cr, padding, padding, w, h, theme.radius as f64);
+                cr.stroke().unwrap();
+            }
+            // --- Конец отрисовки фона и рамки ---
+
             // Обновление размера буфера и применение shape_until_scroll
             {
                 let mut st = state_rc.borrow_mut();
                 st.buffer
                     .set_size(Some((w - mx * 2.0) as f32), Some((h - my * 2.0) as f32));
-                // Прямой вызов без разделения на переменные — компилятор разбивает заимствование по полям
-                st.buffer.shape_until_scroll(&mut st.font_system, false);
-            } // mutable заимствование освобождается
+                let EditorState {
+                    buffer,
+                    font_system,
+                    ..
+                } = &mut *st;
+                buffer.shape_until_scroll(font_system, false);
+            }
 
-            // Сбор layout_runs через неизменяемое заимствование
+            // Сбор layout_runs
             let layout_runs: Vec<(f64, Vec<cosmic_text::LayoutGlyph>)> = {
                 let st = state_rc.borrow();
                 st.buffer
                     .layout_runs()
                     .map(|run| (run.line_y as f64, run.glyphs.to_vec()))
                     .collect()
-            }; // неизменяемое заимствование освобождается
+            };
 
             let (tr, tg, tb, ta) = hex_to_rgba(&theme.text.color).unwrap_or((1.0, 1.0, 1.0, 1.0));
 
@@ -65,12 +86,14 @@ impl EditorWidget {
                         scale as f32,
                     );
 
-                    // Рисование глифа в отдельном блоке с mutable заимствованием
                     {
                         let mut st = state_rc.borrow_mut();
-                        if let Some(image) = st
-                            .swash_cache
-                            .get_image(&mut st.font_system, physical.cache_key)
+                        let EditorState {
+                            swash_cache,
+                            font_system,
+                            ..
+                        } = &mut *st;
+                        if let Some(image) = swash_cache.get_image(font_system, physical.cache_key)
                         {
                             if image.placement.width == 0
                                 || image.placement.height == 0
@@ -99,7 +122,7 @@ impl EditorWidget {
                             .unwrap();
                             cr.restore().unwrap();
                         }
-                    } // mutable заимствование освобождается до следующей итерации
+                    }
                 }
             }
         });
@@ -115,18 +138,6 @@ fn rounded_rect(cr: &gtk4::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f6
     cr.arc(x + r, y + h - r, r, FRAC_PI_2, PI);
     cr.arc(x + r, y + r, r, PI, PI * 1.5);
     cr.close_path();
-}
-
-fn hex_to_rgb(hex: &str) -> Option<(f64, f64, f64)> {
-    let h = hex.trim_start_matches('#');
-    if h.len() != 6 {
-        return None;
-    }
-    Some((
-        u8::from_str_radix(&h[0..2], 16).ok()? as f64 / 255.0,
-        u8::from_str_radix(&h[2..4], 16).ok()? as f64 / 255.0,
-        u8::from_str_radix(&h[4..6], 16).ok()? as f64 / 255.0,
-    ))
 }
 
 fn hex_to_rgba(hex: &str) -> Option<(f64, f64, f64, f64)> {
