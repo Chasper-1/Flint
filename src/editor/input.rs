@@ -5,16 +5,19 @@ use crate::editor::state::EditorState;
 pub struct Input;
 
 impl Input {
-    pub fn handle_key(state: &mut EditorState, key: gdk::Key, modifiers: gdk::ModifierType) -> bool {
-        // true = обработали
-        // false = не обработали
-
+    pub fn handle_key(
+        state: &mut EditorState,
+        key: gdk::Key,
+        modifiers: gdk::ModifierType,
+    ) -> bool {
+        // CTRL+S
         if key == gdk::Key::s && modifiers.contains(gdk::ModifierType::CONTROL_MASK) {
             let content = state.lines.join("\n");
-            std::fs::write("notes.md", content).ok();
+            let _ = std::fs::write("notes.md", content);
             return true;
         }
 
+        // CTRL+Q
         if key == gdk::Key::q && modifiers.contains(gdk::ModifierType::CONTROL_MASK) {
             std::process::exit(0);
         }
@@ -29,10 +32,9 @@ impl Input {
             gdk::Key::Return => state.newline(),
 
             _ => {
+                // 💥 ВАЖНО: GTK Unicode путь
                 if let Some(ch) = key.to_unicode() {
-                    if !ch.is_control() {
-                        state.insert_char(ch);
-                    }
+                    state.insert_char(ch);
                 }
             }
         }

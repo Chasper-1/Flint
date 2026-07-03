@@ -3,7 +3,7 @@ use crate::editor::{state::EditorState, theme};
 use crate::editor::input::Input;
 
 use gtk4::prelude::*;
-use gtk4::{Application, ApplicationWindow, DrawingArea, EventControllerKey};
+use gtk4::{Application, ApplicationWindow, DrawingArea};
 
 use rhai::Engine;
 
@@ -59,12 +59,13 @@ pub fn build_ui(app: &Application) {
         let state = state.clone();
         let area_clone = area.clone();
 
-        let controller = EventControllerKey::new();
-
-        controller.connect_key_pressed(move |_, key, _keycode, modifiers| {
+        let controller = gtk4::EventControllerKey::new();
+        
+        controller.connect_key_pressed(move |_, key, _code, modifiers| {
             let mut state = state.borrow_mut();
         
             Input::handle_key(&mut state, key, modifiers);
+            println!("KEY: {:?}, MODS: {:?}", key, modifiers);
         
             area_clone.queue_draw();
         
@@ -75,8 +76,10 @@ pub fn build_ui(app: &Application) {
     }
 
     window.set_child(Some(&area));
+    window.present();
+    
+    area.set_focusable(true);
+    area.grab_focus();
 
     window.present();
-
-    area.grab_focus();
 }
