@@ -12,15 +12,12 @@ impl EditorWidget {
             .build();
 
         area.set_draw_func(|_, cr, width, height| {
-            // Фон
-            cr.set_source_rgb(0.09, 0.09, 0.10);
-            cr.paint().unwrap();
 
             // Карточка
-            let x = 32.0;
-            let y = 32.0;
-            let w = width as f64 - 64.0;
-            let h = height as f64 - 64.0;
+            let x = 0.0;
+            let y = 0.0;
+            let w = width as f64;
+            let h = height as f64;
             let r = 12.0;
 
             rounded_rect(cr, x, y, w, h, r);
