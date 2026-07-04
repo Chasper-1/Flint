@@ -1,4 +1,4 @@
-use crate::editor::markup::{LineMarkup, parse_line};
+use crate::editor::markup::{SegmentStyle, parse_line};
 use eframe::egui::text::{CCursorRange, CharIndex, LayoutJob};
 use eframe::egui::{
     Color32, Context, FontFamily, FontId, Galley, Id, Stroke, TextEdit, TextFormat, Align,
@@ -6,23 +6,19 @@ use eframe::egui::{
 
 fn append_compensated(
     job: &mut LayoutJob,
-    markup_left: &str,
+    left: usize,
     content: &str,
-    markup_right: Option<&str>,
+    right: usize,
     format: TextFormat,
 ) {
-    if !markup_left.is_empty() {
-        job.append(
-            &"\u{200B}".repeat(markup_left.chars().count()),
-            0.0,
-            format.clone(),
-        );
+    if left > 0 {
+        job.append(&"\u{200B}".repeat(left), 0.0, format.clone());
     }
 
     job.append(content, 0.0, format.clone());
 
-    if let Some(right) = markup_right {
-        job.append(&"\u{200B}".repeat(right.chars().count()), 0.0, format);
+    if right > 0 {
+        job.append(&"\u{200B}".repeat(right), 0.0, format);
     }
 }
 
@@ -45,139 +41,87 @@ pub fn render_line(
             Color32::WHITE,
         );
         job.append(line, 0.0, format);
-    } else {
-        let default_format = TextFormat::simple(
-            FontId::new(base_size, font_family.clone()),
-            Color32::from_rgb(180, 180, 180),
-        );
+        return;
+    }
 
-        match parse_line(line) {
-            LineMarkup::Heading { content, marker } => {
-                let format = TextFormat::simple(
-                    FontId::new(heading_size, FontFamily::Proportional),
-                    Color32::WHITE,
-                );
-                append_compensated(job, &marker, &content, None, format);
-            }
-            LineMarkup::Bold {
-                before,
-                content,
-                after,
-                marker,
-            } => {
-                let format = TextFormat::simple(
-                    FontId::new(base_size, font_family),
-                    Color32::from_rgb(255, 100, 100),
-                );
-                if !before.is_empty() {
-                    job.append(&before, 0.0, default_format.clone());
-                }
-                append_compensated(job, &marker, &content, Some(&marker), format);
-                if !after.is_empty() {
-                    job.append(&after, 0.0, default_format.clone());
-                }
-            }
-            LineMarkup::Italic {
-                before,
-                content,
-                after,
-                marker,
-            } => {
-                let mut format = TextFormat::simple(
-                    FontId::new(base_size, font_family),
+    // Заголовок обрабатываем отдельно (если строка начинается с "# ")
+    if line.starts_with("# ") {
+        let content = &line[2..];
+        let format = TextFormat::simple(
+            FontId::new(heading_size, FontFamily::Proportional),
+            Color32::WHITE,
+        );
+        append_compensated(
+            job,
+            2,
+            content,
+            0,
+            format,
+        );
+        return;
+    }
+
+    // Получаем все сегменты
+    let segments = parse_line(line);
+
+    let default_format = TextFormat::simple(
+        FontId::new(base_size, font_family.clone()),
+        Color32::from_rgb(180, 180, 180),
+    );
+
+    // Один проход по сегментам – выводим каждый
+    for seg in segments {
+        let format = match seg.style {
+            SegmentStyle::Plain => default_format.clone(),
+            SegmentStyle::Bold => TextFormat::simple(
+                FontId::new(base_size, font_family.clone()),
+                Color32::from_rgb(255, 100, 100),
+            ),
+            SegmentStyle::Italic => {
+                let mut f = TextFormat::simple(
+                    FontId::new(base_size, font_family.clone()),
                     Color32::from_rgb(100, 200, 255),
                 );
-                format.italics = true;
-                if !before.is_empty() {
-                    job.append(&before, 0.0, default_format.clone());
-                }
-                append_compensated(job, &marker, &content, Some(&marker), format);
-                if !after.is_empty() {
-                    job.append(&after, 0.0, default_format.clone());
-                }
+                f.italics = true;
+                f
             }
-            LineMarkup::Strikethrough {
-                before,
-                content,
-                after,
-                marker,
-            } => {
-                let mut format = TextFormat::simple(
-                    FontId::new(base_size, font_family),
+            SegmentStyle::Strikethrough => {
+                let mut f = TextFormat::simple(
+                    FontId::new(base_size, font_family.clone()),
                     Color32::from_rgb(200, 150, 150),
                 );
-                format.strikethrough = Stroke::new(1.0, Color32::from_rgb(200, 150, 150));
-                if !before.is_empty() {
-                    job.append(&before, 0.0, default_format.clone());
-                }
-                append_compensated(job, &marker, &content, Some(&marker), format);
-                if !after.is_empty() {
-                    job.append(&after, 0.0, default_format.clone());
-                }
+                f.strikethrough = Stroke::new(1.0, Color32::from_rgb(200, 150, 150));
+                f
             }
-            LineMarkup::Superscript {
-                before,
-                content,
-                after,
-                marker,
-            } => {
-                // ^Верхний индекс^ — красим в желто-оранжевый и смещаем ВВЕРХ
-                let mut format = TextFormat::simple(
-                    FontId::new(base_size * 0.7, font_family),
-                    Color32::from_rgb(255, 200, 100),
-                );
-                format.valign = Align::TOP;
-
-                if !before.is_empty() {
-                    job.append(&before, 0.0, default_format.clone());
-                }
-                append_compensated(job, &marker, &content, Some(&marker), format);
-                if !after.is_empty() {
-                    job.append(&after, 0.0, default_format.clone());
-                }
-            }
-            LineMarkup::Subscript {
-                before,
-                content,
-                after,
-                marker,
-            } => {
-                // ~Нижний индекс~ — красим в зеленый и смещаем ВНИЗ
-                let mut format = TextFormat::simple(
-                    FontId::new(base_size * 0.7, font_family),
+            SegmentStyle::Superscript => {
+                let mut f = TextFormat::simple(
+                    FontId::new(base_size * 0.7, font_family.clone()),
                     Color32::from_rgb(150, 255, 150),
                 );
-                format.valign = Align::BOTTOM;
-
-                if !before.is_empty() {
-                    job.append(&before, 0.0, default_format.clone());
-                }
-                append_compensated(job, &marker, &content, Some(&marker), format);
-                if !after.is_empty() {
-                    job.append(&after, 0.0, default_format.clone());
-                }
+                f.valign = Align::TOP;
+                f
             }
-            LineMarkup::Code {
-                before,
-                content,
-                after,
-                marker,
-            } => {
-                let format = TextFormat::simple(
-                    FontId::new(base_size, FontFamily::Monospace),
-                    Color32::from_rgb(200, 200, 200),
+            SegmentStyle::Subscript => {
+                let mut f = TextFormat::simple(
+                    FontId::new(base_size * 0.7, font_family.clone()),
+                    Color32::from_rgb(255, 200, 100),
                 );
-                if !before.is_empty() {
-                    job.append(&before, 0.0, default_format.clone());
-                }
-                append_compensated(job, &marker, &content, Some(&marker), format);
-                if !after.is_empty() {
-                    job.append(&after, 0.0, default_format.clone());
-                }
+                f.valign = Align::BOTTOM;
+                f
             }
-            LineMarkup::Plain(text) => {
-                job.append(&text, 0.0, default_format);
-            }
+            SegmentStyle::Code => TextFormat::simple(
+                FontId::new(base_size, FontFamily::Monospace),
+                Color32::from_rgb(200, 200, 200),
+            ),
+        };
+
+        // Добавляем компенсацию для маркеров
+        if seg.left_marker_len > 0 {
+            job.append(&"\u{200B}".repeat(seg.left_marker_len), 0.0, format.clone());
+        }
+        job.append(&seg.text, 0.0, format.clone());
+        if seg.right_marker_len > 0 {
+            job.append(&"\u{200B}".repeat(seg.right_marker_len), 0.0, format);
         }
     }
 }
@@ -190,24 +134,36 @@ pub fn adjust_cursor_for_markup(
     galley: &Galley,
 ) {
     if let Some(mut state) = TextEdit::load_state(ctx, id) {
-        if let LineMarkup::Heading { marker, .. } | LineMarkup::Bold { marker, .. } =
-            parse_line(line_text)
-        {
-            let offset = marker.chars().count();
+        let offset = if line_text.starts_with("# ") {
+            2
+        } else {
+            let segments = parse_line(line_text);
 
-            if let Some(range) = state.cursor.char_range() {
-                let mut c = range.primary;
-                let current_index = c.index.0; // CharIndex -> usize
-                let new_index = if right {
-                    current_index + offset
-                } else {
-                    current_index.saturating_sub(offset)
-                };
-                let clamped = new_index.clamp(0, galley.text().chars().count());
-                c.index = CharIndex(clamped);
-                state.cursor.set_char_range(Some(CCursorRange::one(c)));
-                state.store(ctx, id);
-            }
+            segments
+                .iter()
+                .find(|s| !matches!(s.style, SegmentStyle::Plain))
+                .map(|s| s.left_marker_len)
+                .unwrap_or(0)
+        };
+
+        if offset == 0 {
+            return;
+        }
+
+        if let Some(range) = state.cursor.char_range() {
+            let mut c = range.primary;
+
+            let current = c.index.0;
+            let new_index = if right {
+                current + offset
+            } else {
+                current.saturating_sub(offset)
+            };
+
+            c.index = CharIndex(new_index.min(galley.text().chars().count()));
+
+            state.cursor.set_char_range(Some(CCursorRange::one(c)));
+            state.store(ctx, id);
         }
     }
 }

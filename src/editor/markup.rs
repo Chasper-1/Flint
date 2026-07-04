@@ -1,136 +1,89 @@
-pub enum LineMarkup {
-    Heading {
-        content: String,
-        marker: String,
-    },
-    Bold {
-        before: String,
-        content: String,
-        after: String,
-        marker: String,
-    },
-    Italic {
-        before: String,
-        content: String,
-        after: String,
-        marker: String,
-    },
-    Strikethrough {
-        before: String,
-        content: String,
-        after: String,
-        marker: String,
-    },
-    Superscript {
-        before: String,
-        content: String,
-        after: String,
-        marker: String,
-    },
-    Subscript {
-        before: String,
-        content: String,
-        after: String,
-        marker: String,
-    },
-    Code {
-        before: String,
-        content: String,
-        after: String,
-        marker: String,
-    },
-    Plain(String),
+#[derive(Clone, Debug)]
+pub enum SegmentStyle {
+    Plain,
+    Bold,
+    Italic,
+    Strikethrough,
+    Superscript,
+    Subscript,
+    Code,
 }
 
-/// 1. Функция ищет конкретный маркер СТРОГО в начале строки
-fn match_start<'a>(line: &'a str, marker: &str) -> Option<&'a str> {
-    if line.starts_with(marker) {
-        Some(&line[marker.len()..])
-    } else {
-        None
-    }
+pub struct Segment {
+    pub text: String,
+    pub style: SegmentStyle,
+    pub left_marker_len: usize,
+    pub right_marker_len: usize,
 }
 
-/// 2. Функция проверяет, обернута ли строка в парный маркер с двух сторон в любом месте
-fn match_paired<'a>(line: &'a str, marker: &str) -> Option<(&'a str, &'a str, &'a str)> {
-    let m_len = marker.len();
-    if let Some(start_idx) = line.find(marker) {
-        let before = &line[..start_idx];
-        let after_first = &line[start_idx + m_len..];
-        if let Some(end_idx) = after_first.find(marker) {
-            let content = &after_first[..end_idx];
-            let after = &after_first[end_idx + m_len..];
-            return Some((before, content, after));
+/// Парсит строку и возвращает все сегменты с разметкой
+pub fn parse_line(line: &str) -> Vec<Segment> {
+    let mut segments = Vec::new();
+    let mut remaining = line;
+    let markers = ["**", "~~", "^", "~", "`", "*", "_"];
+
+    while !remaining.is_empty() {
+        let mut found: Option<(usize, &str, usize)> = None;
+
+        // Ищем самый левый маркер
+        for &m in &markers {
+            if let Some(pos) = remaining.find(m) {
+                // Проверяем, что это не часть более длинного маркера
+                if m == "*" && remaining[pos..].starts_with("**") {
+                    continue;
+                }
+
+                let rest = &remaining[pos + m.len()..];
+
+                if let Some(end) = rest.find(m) {
+                    let end_pos = pos + m.len() + end;
+
+                    if found.map_or(true, |(p, _, _)| pos < p) {
+                        found = Some((pos, m, end_pos));
+                    }
+                }
+            }
+        }
+
+        if let Some((start, marker, end)) = found {
+            if start > 0 {
+                segments.push(Segment {
+                    text: remaining[..start].to_string(),
+                    style: SegmentStyle::Plain,
+                    left_marker_len: 0,
+                    right_marker_len: 0,
+                });
+            }
+
+            let content = &remaining[start + marker.len()..end];
+            let style = match marker {
+                "**" => SegmentStyle::Bold,
+                "*" | "_" => SegmentStyle::Italic,
+                "~~" => SegmentStyle::Strikethrough,
+                "^" => SegmentStyle::Superscript,
+                "~" => SegmentStyle::Subscript,
+                "`" => SegmentStyle::Code,
+                _ => unreachable!(),
+            };
+
+            segments.push(Segment {
+                text: content.to_string(),
+                style,
+                left_marker_len: marker.len(),
+                right_marker_len: marker.len(),
+            });
+
+            remaining = &remaining[end + marker.len()..];
+        } else {
+            segments.push(Segment {
+                text: remaining.to_string(),
+                style: SegmentStyle::Plain,
+                left_marker_len: 0,
+                right_marker_len: 0,
+            });
+            break;
         }
     }
-    None
-}
 
-/// Анализирует строку и возвращает тип разметки (без дублирования кода)
-pub fn parse_line(line: &str) -> LineMarkup {
-    if let Some(content) = match_start(line, "# ") {
-        return LineMarkup::Heading {
-            content: content.to_string(),
-            marker: "# ".to_string(),
-        };
-    }
-
-    if let Some((b, c, a)) = match_paired(line, "**") {
-        return LineMarkup::Bold {
-            before: b.to_string(),
-            content: c.to_string(),
-            after: a.to_string(),
-            marker: "**".to_string(),
-        };
-    }
-    if let Some((b, c, a)) = match_paired(line, "~~") {
-        return LineMarkup::Strikethrough {
-            before: b.to_string(),
-            content: c.to_string(),
-            after: a.to_string(),
-            marker: "~~".to_string(),
-        };
-    }
-    if let Some((b, c, a)) = match_paired(line, "*") {
-        return LineMarkup::Italic {
-            before: b.to_string(),
-            content: c.to_string(),
-            after: a.to_string(),
-            marker: "*".to_string(),
-        };
-    }
-    if let Some((b, c, a)) = match_paired(line, "_") {
-        return LineMarkup::Italic {
-            before: b.to_string(),
-            content: c.to_string(),
-            after: a.to_string(),
-            marker: "_".to_string(),
-        };
-    }
-    if let Some((b, c, a)) = match_paired(line, "^") {
-        return LineMarkup::Superscript {
-            before: b.to_string(),
-            content: c.to_string(),
-            after: a.to_string(),
-            marker: "^".to_string(),
-        };
-    }
-    if let Some((b, c, a)) = match_paired(line, "~") {
-        return LineMarkup::Subscript {
-            before: b.to_string(),
-            content: c.to_string(),
-            after: a.to_string(),
-            marker: "~".to_string(),
-        };
-    }
-    if let Some((b, c, a)) = match_paired(line, "`") {
-        return LineMarkup::Code {
-            before: b.to_string(),
-            content: c.to_string(),
-            after: a.to_string(),
-            marker: "`".to_string(),
-        };
-    }
-
-    LineMarkup::Plain(line.to_string())
+    segments
 }
