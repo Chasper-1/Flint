@@ -1,7 +1,7 @@
+use crate::editor::layouter;
+use crate::editor::state::{EditMode, EditorState};
 use eframe::egui;
 use std::fs;
-use crate::editor::state::{EditMode, EditorState};
-use crate::editor::layouter;
 
 pub struct FlintApp {
     state: EditorState,
@@ -36,83 +36,116 @@ impl eframe::App for FlintApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            egui::Frame::NONE.inner_margin(self.state.theme.padding).show(ui, |ui| {
-                egui::ScrollArea::vertical()
-                    .id_salt("editor_scroll")
-                    .auto_shrink([false; 2])
-                    .show(ui, |ui| {
-                        let theme = self.state.theme.clone();
-                        let base_size = theme.text.size;
-                        let heading_size = base_size * 1.6;
-                        let font_family = theme.text.font_family.map_or(
-                            egui::FontFamily::Proportional, 
-                            |name| egui::FontFamily::Name(std::sync::Arc::from(name.as_str()))
-                        );
+            egui::Frame::NONE
+                .inner_margin(self.state.theme.padding)
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical()
+                        .id_salt("editor_scroll")
+                        .auto_shrink([false; 2])
+                        .show(ui, |ui| {
+                            let theme = self.state.theme.clone();
+                            let base_size = theme.text.size;
+                            let heading_size = base_size * 1.6;
+                            let font_family = theme
+                                .text
+                                .font_family
+                                .map_or(egui::FontFamily::Proportional, |name| {
+                                    egui::FontFamily::Name(std::sync::Arc::from(name.as_str()))
+                                });
 
-                        let mut layouter_func = |ui: &egui::Ui, text: &str, wrap_width: f32| {
-                            let mut job = egui::text::LayoutJob::default();
-                            job.wrap.max_width = wrap_width;
-                            
-                            for (idx, line) in text.split('\n').enumerate() {
-                                let is_active = Some(idx) == self.state.active_line_index;
-                                let show_markup = self.state.mode == EditMode::Source 
-                                    || (self.state.mode == EditMode::LivePreview && is_active);
+                            let mut layouter_func = |ui: &egui::Ui, text: &str, wrap_width: f32| {
+                                let mut job = egui::text::LayoutJob::default();
+                                job.wrap.max_width = wrap_width;
 
-                                layouter::render_line(
-                                    &mut job, line, is_active, base_size, heading_size, 
-                                    font_family.clone(), show_markup
-                                );
-                                job.append("\n", 0.0, egui::TextFormat::default());
-                            }
-                            ui.fonts(|f| f.layout_job(job))
-                        };
+                                for (idx, line) in text.split('\n').enumerate() {
+                                    let is_active = Some(idx) == self.state.active_line_index;
+                                    let show_markup = self.state.mode == EditMode::Source
+                                        || (self.state.mode == EditMode::LivePreview && is_active);
 
-                        let text_edit = egui::TextEdit::multiline(&mut self.state.content)
-                            .desired_width(f32::INFINITY)
-                            .min_size(ui.available_size())
-                            .frame(false)
-                            .lock_focus(true)
-                            .interactive(self.state.mode != EditMode::Preview)
-                            .text_color(self.state.theme.text.color.to_color32())
-                            .layouter(&mut layouter_func);
+                                    layouter::render_line(
+                                        &mut job,
+                                        line,
+                                        is_active,
+                                        base_size,
+                                        heading_size,
+                                        font_family.clone(),
+                                        show_markup,
+                                    );
+                                    job.append("\n", 0.0, egui::TextFormat::default());
+                                }
+                                ui.fonts(|f| f.layout_job(job))
+                            };
 
-                        let output = text_edit.show(ui);
-                        
-                        if let Some(state) = egui::TextEdit::load_state(ctx, output.response.id) {
-                            if let Some(range) = state.cursor.range(&output.galley) {
-                                let line = self.state.content.chars().take(range.primary.ccursor.index).filter(|&c| c == '\n').count();
-                                if self.state.active_line_index != Some(line) {
-                                    self.state.active_line_index = Some(line);
-                                    ctx.request_repaint();
+                            let text_edit = egui::TextEdit::multiline(&mut self.state.content)
+                                .desired_width(f32::INFINITY)
+                                .min_size(ui.available_size())
+                                .frame(false)
+                                .lock_focus(true)
+                                .interactive(self.state.mode != EditMode::Preview)
+                                .text_color(self.state.theme.text.color.to_color32())
+                                .layouter(&mut layouter_func);
+
+                            // Вместо прямого вызова внутри ctx.input, используй response от TextEdit
+                            let output = text_edit.show(ui);
+
+                            // 1. Сначала обрабатываем обновление индекса строки (это безопасно)
+                            if let Some(state) = egui::TextEdit::load_state(ctx, output.response.id)
+                            {
+                                if let Some(range) = state.cursor.char_range() {
+                                    let line = self
+                                        .state
+                                        .content
+                                        .chars()
+                                        .take(range.primary.index)
+                                        .filter(|&c| c == '\n')
+                                        .count();
+                                    if self.state.active_line_index != Some(line) {
+                                        self.state.active_line_index = Some(line);
+                                    }
                                 }
                             }
-                        }
 
-                        if output.response.has_focus() {
+                            // 2. Корректировка курсора только при нажатии клавиш
+                            if output.response.has_focus() {
+                                // Получаем состояние ввода
+                                let right = ctx.input(|i| i.key_pressed(egui::Key::ArrowRight));
+                                let left = ctx.input(|i| i.key_pressed(egui::Key::ArrowLeft));
+
+                                // Убираем условие ctrl, чтобы компенсация работала всегда
+                                if right || left {
+                                    if let Some(line_idx) = self.state.active_line_index {
+                                        if let Some(line) = self.state.content.lines().nth(line_idx)
+                                        {
+                                            crate::editor::layouter::adjust_cursor_for_markup(
+                                                ctx,
+                                                output.response.id,
+                                                line,
+                                                right,
+                                                &output.galley,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+
                             ctx.input(|i| {
-                                let ctrl = i.modifiers.ctrl;
-                                let right = i.key_pressed(egui::Key::ArrowRight);
-                                let left = i.key_pressed(egui::Key::ArrowLeft);
-                        
-                                if ctrl && (right || left) {
-                                    if let Some(line) = self.state.content.lines().nth(self.state.active_line_index.unwrap_or(0)) {
-                                        // Вызываем нашу функцию из layouter
-                                        crate::editor::layouter::adjust_cursor_for_markup(ctx, output.response.id, line, right, &output.galley);
+                                if i.modifiers.command {
+                                    if i.key_pressed(egui::Key::Num1) {
+                                        self.state.mode = EditMode::Preview;
+                                    }
+                                    if i.key_pressed(egui::Key::Num2) {
+                                        self.state.mode = EditMode::LivePreview;
+                                    }
+                                    if i.key_pressed(egui::Key::Num3) {
+                                        self.state.mode = EditMode::Source;
+                                    }
+                                    if i.key_pressed(egui::Key::S) {
+                                        let _ = fs::write("notes.md", &self.state.content);
                                     }
                                 }
                             });
-                        }
-
-                        ctx.input(|i| {
-                            if i.modifiers.command {
-                                if i.key_pressed(egui::Key::Num1) { self.state.mode = EditMode::Preview; }
-                                if i.key_pressed(egui::Key::Num2) { self.state.mode = EditMode::LivePreview; }
-                                if i.key_pressed(egui::Key::Num3) { self.state.mode = EditMode::Source; }
-                                if i.key_pressed(egui::Key::S) { let _ = fs::write("notes.md", &self.state.content); }
-                            }
                         });
-                    });
-            });
+                });
         });
     }
 }
