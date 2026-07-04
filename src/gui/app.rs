@@ -57,7 +57,10 @@ impl eframe::App for FlintApp {
                                 let mut job = egui::text::LayoutJob::default();
                                 job.wrap.max_width = wrap_width;
 
-                                for (idx, line) in text.split('\n').enumerate() {
+                                let lines: Vec<&str> = text.split('\n').collect();
+                                let line_count = lines.len();
+
+                                for (idx, line) in lines.iter().enumerate() {
                                     let is_active = Some(idx) == self.state.active_line_index;
                                     let show_markup = self.state.mode == EditMode::Source
                                         || (self.state.mode == EditMode::LivePreview && is_active);
@@ -71,7 +74,10 @@ impl eframe::App for FlintApp {
                                         font_family.clone(),
                                         show_markup,
                                     );
-                                    job.append("\n", 0.0, egui::TextFormat::default());
+
+                                    if idx < line_count - 1 {
+                                        job.append("\n", 0.0, egui::TextFormat::default());
+                                    }
                                 }
                                 ui.fonts(|f| f.layout_job(job))
                             };
@@ -92,15 +98,24 @@ impl eframe::App for FlintApp {
                             if let Some(state) = egui::TextEdit::load_state(ctx, output.response.id)
                             {
                                 if let Some(range) = state.cursor.char_range() {
-                                    let line = self
+                                    // Считаем переносы как обычно
+                                    let total_newlines =
+                                        self.state.content.chars().filter(|&c| c == '\n').count();
+                                    let current_line = self
                                         .state
                                         .content
                                         .chars()
                                         .take(range.primary.index)
                                         .filter(|&c| c == '\n')
                                         .count();
+
+                                    // Если курсор на последней строке и она пустая/виртуальная,
+                                    // ограничиваем индекс максимальным количеством существующих строк
+                                    let line = current_line.min(total_newlines);
+
                                     if self.state.active_line_index != Some(line) {
                                         self.state.active_line_index = Some(line);
+                                        ctx.request_repaint();
                                     }
                                 }
                             }

@@ -1,9 +1,9 @@
-use eframe::egui;
-use rhai::Engine;
-use std::fs;
 use crate::editor::state::EditorState;
 use crate::editor::theme;
 use crate::gui::app::FlintApp;
+use eframe::egui;
+use rhai::Engine;
+use std::fs;
 
 pub fn run_app() -> eframe::Result {
     let options = eframe::NativeOptions {
@@ -22,17 +22,20 @@ pub fn run_app() -> eframe::Result {
             });
 
             let mut engine = Engine::new();
-            
+
             // Регистрируем для всех комбинаций, которые может выдать парсер Rhai
             engine.register_fn("rgba", |r: i64, g: i64, b: i64, a: f64| {
                 format!("rgba({}, {}, {}, {})", r, g, b, a)
             });
-            
+
             let ast = engine.compile(&src).expect("Rhai compile error");
             let rhai_map: rhai::Map = engine.eval_ast(&ast).expect("Rhai runtime error");
             let theme = theme::parse_theme(rhai_map);
 
-            let text = fs::read_to_string("notes.md").unwrap_or_default();
+            let text = fs::read_to_string("notes.md")
+                .unwrap_or_default()
+                .trim_end_matches('\n') // убираем последний \n
+                .to_string();
             let state = EditorState::new(theme, text);
 
             Ok(Box::new(FlintApp::new(cc, state)))
