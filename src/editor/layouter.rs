@@ -1,7 +1,7 @@
 use crate::editor::markup::{LineMarkup, parse_line};
 use eframe::egui::text::{CCursorRange, CharIndex, LayoutJob};
 use eframe::egui::{
-    Color32, Context, FontFamily, FontId, Galley, Id, Stroke, TextEdit, TextFormat,
+    Color32, Context, FontFamily, FontId, Galley, Id, Stroke, TextEdit, TextFormat, Align,
 };
 
 fn append_compensated(
@@ -50,7 +50,7 @@ pub fn render_line(
             FontId::new(base_size, font_family.clone()),
             Color32::from_rgb(180, 180, 180),
         );
-        
+
         match parse_line(line) {
             LineMarkup::Heading { content, marker } => {
                 let format = TextFormat::simple(
@@ -121,10 +121,13 @@ pub fn render_line(
                 after,
                 marker,
             } => {
-                let format = TextFormat::simple(
+                // ^Верхний индекс^ — красим в желто-оранжевый и смещаем ВВЕРХ
+                let mut format = TextFormat::simple(
                     FontId::new(base_size * 0.7, font_family),
-                    Color32::from_rgb(150, 255, 150),
+                    Color32::from_rgb(255, 200, 100),
                 );
+                format.valign = Align::TOP;
+
                 if !before.is_empty() {
                     job.append(&before, 0.0, default_format.clone());
                 }
@@ -139,10 +142,13 @@ pub fn render_line(
                 after,
                 marker,
             } => {
-                let format = TextFormat::simple(
+                // ~Нижний индекс~ — красим в зеленый и смещаем ВНИЗ
+                let mut format = TextFormat::simple(
                     FontId::new(base_size * 0.7, font_family),
-                    Color32::from_rgb(255, 200, 100),
+                    Color32::from_rgb(150, 255, 150),
                 );
+                format.valign = Align::BOTTOM;
+
                 if !before.is_empty() {
                     job.append(&before, 0.0, default_format.clone());
                 }
