@@ -9,63 +9,78 @@ pub enum LineMarkup {
     Plain(String),
 }
 
-/// Анализирует строку и возвращает тип разметки
+/// 1. Функция ищет конкретный маркер СТРОГО в начале строки
+fn match_start<'a>(line: &'a str, marker: &str) -> Option<&'a str> {
+    if line.starts_with(marker) {
+        Some(&line[marker.len()..])
+    } else {
+        None
+    }
+}
+
+/// 2. Функция проверяет, обернута ли строка в парный маркер с двух сторон в любом месте
+fn match_paired<'a>(line: &'a str, marker: &str) -> Option<&'a str> {
+    let m_len = marker.len();
+    // Проверяем, что строка длиннее двух маркеров и начинается/заканчивается на них
+    if line.len() > m_len * 2 && line.starts_with(marker) && line.ends_with(marker) {
+        // Возвращаем строго ОДИН срез текста внутри маркеров (это &str, а не кортеж!)
+        Some(&line[m_len..line.len() - m_len])
+    } else {
+        None
+    }
+}
+
+/// Анализирует строку и возвращает тип разметки (без дублирования кода)
 pub fn parse_line(line: &str) -> LineMarkup {
-    // Проверяем заголовок
-    if line.starts_with("# ") {
+    // Проверяем блочные элементы (только в начале)
+    if let Some(content) = match_start(line, "# ") {
         return LineMarkup::Heading {
-            content: line[2..].to_string(),
+            content: content.to_string(),
             marker: "# ".to_string(),
         };
     }
 
-    // Проверяем жирный (самый длинный маркер)
-    if line.starts_with("**") && line.ends_with("**") && line.len() > 4 {
+    // Проверяем парные элементы (срезаются со старта и конца всей строки)
+    // Важно: проверяем "**" и "~~" раньше одиночных "*" и "~"
+    if let Some(content) = match_paired(line, "**") {
         return LineMarkup::Bold {
-            content: line[2..line.len() - 2].to_string(),
+            content: content.to_string(),
             marker: "**".to_string(),
         };
     }
-
-    // Зачёркнутый
-    if line.starts_with("~~") && line.ends_with("~~") && line.len() > 4 {
+    if let Some(content) = match_paired(line, "~~") {
         return LineMarkup::Strikethrough {
-            content: line[2..line.len() - 2].to_string(),
+            content: content.to_string(),
             marker: "~~".to_string(),
         };
     }
-
-    // Курсив (одинарные звёздочки или подчёркивания)
-    if (line.starts_with('*') && line.ends_with('*') && line.len() > 2)
-        || (line.starts_with('_') && line.ends_with('_') && line.len() > 2)
-    {
-        let marker = if line.starts_with('*') { "*" } else { "_" };
+    if let Some(content) = match_paired(line, "*") {
         return LineMarkup::Italic {
-            content: line[1..line.len() - 1].to_string(),
-            marker: marker.to_string(),
+            content: content.to_string(),
+            marker: "*".to_string(),
         };
     }
-
-    // Верхний индекс (маркер ^)
-    if line.starts_with('^') && line.ends_with('^') && line.len() > 2 {
+    if let Some(content) = match_paired(line, "_") {
+        return LineMarkup::Italic {
+            content: content.to_string(),
+            marker: "_".to_string(),
+        };
+    }
+    if let Some(content) = match_paired(line, "^") {
         return LineMarkup::Superscript {
-            content: line[1..line.len() - 1].to_string(),
+            content: content.to_string(),
             marker: "^".to_string(),
         };
     }
-
-    // Нижний индекс (маркер ~)
-    if line.starts_with('~') && line.ends_with('~') && line.len() > 2 {
+    if let Some(content) = match_paired(line, "~") {
         return LineMarkup::Subscript {
-            content: line[1..line.len() - 1].to_string(),
+            content: content.to_string(),
             marker: "~".to_string(),
         };
     }
-
-    // Моноширинный код (обратные кавычки)
-    if line.starts_with('`') && line.ends_with('`') && line.len() > 2 {
+    if let Some(content) = match_paired(line, "`") {
         return LineMarkup::Code {
-            content: line[1..line.len() - 1].to_string(),
+            content: content.to_string(),
             marker: "`".to_string(),
         };
     }
