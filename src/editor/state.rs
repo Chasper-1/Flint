@@ -11,7 +11,6 @@ pub struct EditorState {
     pub theme: EditorTheme,
     pub content: String,
     pub mode: EditMode,
-    pub active_line_index: Option<usize>,
 }
 
 impl EditorState {
@@ -20,7 +19,6 @@ impl EditorState {
             theme,
             content: text,
             mode: EditMode::LivePreview,
-            active_line_index: None,
         }
     }
 }

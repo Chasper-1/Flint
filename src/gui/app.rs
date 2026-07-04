@@ -64,15 +64,10 @@ impl eframe::App for FlintApp {
                                     let line_count = lines.len();
 
                                     for (idx, line) in lines.iter().enumerate() {
-                                        let is_active = Some(idx) == self.state.active_line_index;
-                                        let show_markup = self.state.mode == EditMode::Source
-                                            || (self.state.mode == EditMode::LivePreview
-                                                && is_active);
-
+                                        let show_markup = self.state.mode == EditMode::Source;
                                         layouter::render_line(
                                             &mut job,
                                             line,
-                                            is_active,
                                             base_size,
                                             heading_size,
                                             font_family.clone(),
@@ -96,56 +91,6 @@ impl eframe::App for FlintApp {
                                 .layouter(&mut layouter_func);
 
                             let output = text_edit.show(ui);
-
-                            // Обновление активной строки
-                            if let Some(state) =
-                                egui::TextEdit::load_state(ui.ctx(), output.response.id)
-                            {
-                                if let Some(range) = state.cursor.char_range() {
-                                    let total_newlines =
-                                        self.state.content.chars().filter(|&c| c == '\n').count();
-                                    let current_line = self
-                                        .state
-                                        .content
-                                        .chars()
-                                        .take(range.primary.index.into())
-                                        .filter(|&c| c == '\n')
-                                        .count();
-                                    let line = current_line.min(total_newlines);
-                                    if self.state.active_line_index != Some(line) {
-                                        self.state.active_line_index = Some(line);
-                                        ui.ctx().request_repaint();
-                                    }
-                                }
-                            }
-
-                            // Коррекция курсора
-                            if output.response.has_focus() {
-                                let right =
-                                    ui.ctx().input(|i| i.key_pressed(egui::Key::ArrowRight));
-                                let left = ui.ctx().input(|i| i.key_pressed(egui::Key::ArrowLeft));
-                                if right || left {
-                                    if let Some(line_idx) = self.state.active_line_index {
-                                        if let Some(line) = self.state.content.lines().nth(line_idx)
-                                        {
-                                            let is_active =
-                                                Some(line_idx) == self.state.active_line_index;
-                                            let show_markup = self.state.mode == EditMode::Source
-                                                || (self.state.mode == EditMode::LivePreview
-                                                    && is_active);
-                                            if !show_markup {
-                                                crate::editor::layouter::adjust_cursor_for_markup(
-                                                    ui.ctx(),
-                                                    output.response.id,
-                                                    line,
-                                                    right,
-                                                    &output.galley,
-                                                );
-                                            }
-                                        }
-                                    }
-                                }
-                            }
 
                             // Горячие клавиши
                             ui.ctx().input(|i| {

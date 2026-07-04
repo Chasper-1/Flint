@@ -1,7 +1,7 @@
 use crate::editor::markup::{SegmentStyle, parse_line};
 use eframe::egui::text::{CCursorRange, CharIndex, LayoutJob};
 use eframe::egui::{
-    Color32, Context, FontFamily, FontId, Galley, Id, Stroke, TextEdit, TextFormat, Align,
+    Align, Color32, Context, FontFamily, FontId, Galley, Id, Stroke, TextEdit, TextFormat,
 };
 
 fn append_compensated(
@@ -25,58 +25,44 @@ fn append_compensated(
 pub fn render_line(
     job: &mut LayoutJob,
     line: &str,
-    is_active: bool,
     base_size: f32,
     heading_size: f32,
     font_family: FontFamily,
     show_markup: bool,
 ) {
-    if show_markup || is_active {
-        let is_heading = line.starts_with("# ");
-        let format = TextFormat::simple(
-            FontId::new(
-                if is_heading { heading_size } else { base_size },
-                font_family,
-            ),
-            Color32::WHITE,
-        );
-        job.append(line, 0.0, format);
-        return;
-    }
-
-    // Заголовок обрабатываем отдельно (если строка начинается с "# ")
-    if line.starts_with("# ") {
-        let content = &line[2..];
-        let format = TextFormat::simple(
-            FontId::new(heading_size, FontFamily::Proportional),
-            Color32::WHITE,
-        );
-        append_compensated(
-            job,
-            2,
-            content,
-            0,
-            format,
-        );
-        return;
-    }
-
-    // Получаем все сегменты
-    let segments = parse_line(line);
-
     let default_format = TextFormat::simple(
         FontId::new(base_size, font_family.clone()),
         Color32::from_rgb(180, 180, 180),
     );
 
-    // Один проход по сегментам – выводим каждый
-    for seg in segments {
+    // SOURCE РЕЖИМ → показываем сырой текст
+    if show_markup {
+        job.append(line, 0.0, default_format);
+        return;
+    }
+
+    // Заголовок
+    if line.starts_with("# ") {
+        let content = &line[2..];
+
+        let format = TextFormat::simple(FontId::new(heading_size, font_family), Color32::WHITE);
+
+        job.append(content, 0.0, format);
+        return;
+    }
+
+    // Парсим разметку
+    let cache = parse_line(line);
+
+    for seg in &cache.segments {
         let format = match seg.style {
             SegmentStyle::Plain => default_format.clone(),
+
             SegmentStyle::Bold => TextFormat::simple(
                 FontId::new(base_size, font_family.clone()),
                 Color32::from_rgb(255, 100, 100),
             ),
+
             SegmentStyle::Italic => {
                 let mut f = TextFormat::simple(
                     FontId::new(base_size, font_family.clone()),
@@ -85,6 +71,7 @@ pub fn render_line(
                 f.italics = true;
                 f
             }
+
             SegmentStyle::Strikethrough => {
                 let mut f = TextFormat::simple(
                     FontId::new(base_size, font_family.clone()),
@@ -93,6 +80,7 @@ pub fn render_line(
                 f.strikethrough = Stroke::new(1.0, Color32::from_rgb(200, 150, 150));
                 f
             }
+
             SegmentStyle::Superscript => {
                 let mut f = TextFormat::simple(
                     FontId::new(base_size * 0.7, font_family.clone()),
@@ -101,6 +89,7 @@ pub fn render_line(
                 f.valign = Align::TOP;
                 f
             }
+
             SegmentStyle::Subscript => {
                 let mut f = TextFormat::simple(
                     FontId::new(base_size * 0.7, font_family.clone()),
@@ -109,20 +98,20 @@ pub fn render_line(
                 f.valign = Align::BOTTOM;
                 f
             }
+
             SegmentStyle::Code => TextFormat::simple(
                 FontId::new(base_size, FontFamily::Monospace),
                 Color32::from_rgb(200, 200, 200),
             ),
         };
 
-        // Добавляем компенсацию для маркеров
-        if seg.left_marker_len > 0 {
-            job.append(&"\u{200B}".repeat(seg.left_marker_len), 0.0, format.clone());
-        }
-        job.append(&seg.text, 0.0, format.clone());
-        if seg.right_marker_len > 0 {
-            job.append(&"\u{200B}".repeat(seg.right_marker_len), 0.0, format);
-        }
+        append_compensated(
+            job,
+            seg.left_marker_len,
+            &seg.text,
+            seg.right_marker_len,
+            format,
+        );
     }
 }
 
@@ -137,9 +126,10 @@ pub fn adjust_cursor_for_markup(
         let offset = if line_text.starts_with("# ") {
             2
         } else {
-            let segments = parse_line(line_text);
+            let cache = parse_line(line_text);
 
-            segments
+            cache
+                .segments
                 .iter()
                 .find(|s| !matches!(s.style, SegmentStyle::Plain))
                 .map(|s| s.left_marker_len)
