@@ -1,7 +1,6 @@
-use super::cache::MarkupCache;
+use crate::editor::cache::{DocumentCache, MarkupCache};
 use super::markers::{marker_style, MARKERS};
 use super::segment::{Segment, SegmentStyle};
-use super::document_cache::DocumentCache;
 
 pub fn parse_line(line: &str) -> MarkupCache {
     let mut cache = MarkupCache::default();

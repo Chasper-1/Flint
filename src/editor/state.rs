@@ -1,5 +1,6 @@
 use crate::editor::theme::EditorTheme;
-use crate::editor::markup::{DocumentCache, parse_document};
+use crate::editor::markup::{parse_document};
+use crate::editor::cache::DocumentCache;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EditMode {

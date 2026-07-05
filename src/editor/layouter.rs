@@ -1,7 +1,8 @@
-use crate::editor::markup::{MarkupCache, SegmentStyle};
-use eframe::egui::text::{CCursorRange, CharIndex, LayoutJob};
+use crate::editor::markup::{SegmentStyle};
+use crate::editor::cache::MarkupCache;
+use eframe::egui::text::{LayoutJob};
 use eframe::egui::{
-    Align, Color32, Context, FontFamily, FontId, Galley, Id, Stroke, TextEdit, TextFormat,
+    Align, Color32, FontFamily, FontId, Stroke, TextFormat,
 };
 
 fn append_compensated(
@@ -113,46 +114,3 @@ pub fn render_line(
         );
     }
 }
-
-/*pub fn adjust_cursor_for_markup(
-    ctx: &Context,
-    id: Id,
-    line_text: &str,
-    right: bool,
-    galley: &Galley,
-) {
-    if let Some(mut state) = TextEdit::load_state(ctx, id) {
-        let offset = if line_text.starts_with("# ") {
-            2
-        } else {
-            let cache = parse_line(line_text);
-
-            cache
-                .segments
-                .iter()
-                .find(|s| !matches!(s.style, SegmentStyle::Plain))
-                .map(|s| s.left_marker_len)
-                .unwrap_or(0)
-        };
-
-        if offset == 0 {
-            return;
-        }
-
-        if let Some(range) = state.cursor.char_range() {
-            let mut c = range.primary;
-
-            let current = c.index.0;
-            let new_index = if right {
-                current + offset
-            } else {
-                current.saturating_sub(offset)
-            };
-
-            c.index = CharIndex(new_index.min(galley.text().chars().count()));
-
-            state.cursor.set_char_range(Some(CCursorRange::one(c)));
-            state.store(ctx, id);
-        }
-    }
-}*/
