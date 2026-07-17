@@ -37,6 +37,7 @@ impl EditorWidget {
         &self.content
     }
 
+    #[allow(dead_code)]
     pub fn set_content(&mut self, text: &str) {
         self.content = text.to_string();
         self.cursor = Cursor::new();

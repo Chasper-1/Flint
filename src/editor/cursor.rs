@@ -31,10 +31,6 @@ impl Cursor {
         self.col_visual = 0.0;
     }
 
-    pub fn blink_on(&self) -> bool {
-        self.blink_on
-    }
-
     pub fn blink(&mut self) -> bool {
         let now = Instant::now();
         if now.duration_since(self.last_blink) > Duration::from_millis(530) {
@@ -83,16 +79,6 @@ impl Cursor {
         let end = self.line_end_byte(content);
         self.raw = end;
         self.col_visual = f32::MAX;
-    }
-
-    pub fn clamp_to_line(&mut self, content: &str) {
-        let start = self.line_start_byte(content);
-        let end = self.line_end_byte(content);
-        if self.raw < start {
-            self.raw = start;
-        } else if self.raw > end {
-            self.raw = end;
-        }
     }
 
     pub fn update_line(&mut self, content: &str) {
@@ -153,9 +139,4 @@ impl Cursor {
         content.len()
     }
 
-    pub fn line_text<'a>(&self, content: &'a str) -> &'a str {
-        let start = self.line_start_byte(content);
-        let end = self.line_end_byte(content);
-        &content[start..end]
-    }
 }

@@ -32,8 +32,6 @@ pub fn parse_document(text: &str) -> DocumentCache {
                     right_marker_len: if pi == n_parts - 1 { seg.right_marker_len } else { 0 },
                     raw_start: raw_offset,
                     raw_end: raw_offset + part.len(),
-                    visible_start: 0,
-                    visible_end: part.len(),
                 });
                 raw_offset += part.len() + 1;
             }
@@ -71,8 +69,6 @@ fn parse_region(text: &str, start: usize, end: usize, parent_style: StyleFlags) 
                     right_marker_len: 0,
                     raw_start: pos - 1,
                     raw_end: pos + ch_len,
-                    visible_start: 0,
-                    visible_end: ch_len,
                 });
                 pos += ch_len;
                 continue;
@@ -142,8 +138,6 @@ fn parse_region(text: &str, start: usize, end: usize, parent_style: StyleFlags) 
             right_marker_len: 0,
             raw_start: text_start,
             raw_end: pos,
-            visible_start: 0,
-            visible_end: pos - text_start,
         });
     }
 

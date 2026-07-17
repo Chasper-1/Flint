@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::editor::editor_widget::EditorWidget;
 
 pub fn move_left(widget: &mut EditorWidget) {

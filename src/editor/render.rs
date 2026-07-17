@@ -46,12 +46,13 @@ pub fn build(
     let mut new_galleys = Vec::with_capacity(num_lines);
     let mut total_height = 0.0;
 
+    let mut line_start = 0usize;
     for (i, line) in lines.iter().enumerate() {
         let is_active = mode == EditMode::LivePreview && i == active_line;
         let source_mode = mode == EditMode::Source || is_active;
 
         let job = if source_mode {
-            source_layout(line, cache.lines.get(i), base_size, heading_size, &font_family)
+            source_layout(line, line_start, cache.lines.get(i), base_size, heading_size, &font_family)
         } else {
             preview_layout(line, cache.lines.get(i), base_size, heading_size, &font_family)
         };
@@ -59,6 +60,11 @@ pub fn build(
         let galley = ui.fonts_mut(|f| f.layout_job(job));
         total_height += galley.size().y;
         new_galleys.push(Some(galley));
+
+        line_start += line.len() + 1;
+        if line_start > content.len() {
+            line_start = content.len();
+        }
     }
 
     galleys.galleys = new_galleys;
@@ -67,6 +73,7 @@ pub fn build(
 
 fn source_layout(
     line: &str,
+    line_start: usize,
     line_cache: Option<&crate::editor::cache::MarkupCache>,
     base_size: f32,
     heading_size: f32,
@@ -109,8 +116,11 @@ fn source_layout(
     let mut last_end = 0usize;
 
     for seg in &cache.segments {
-        if seg.raw_start > last_end {
-            let marker = &line[last_end..seg.raw_start];
+        let seg_start = seg.raw_start.saturating_sub(line_start);
+        let seg_end = seg.raw_end.saturating_sub(line_start);
+
+        if seg_start > last_end && seg_start <= line.len() {
+            let marker = &line[last_end..seg_start];
             if !marker.is_empty() {
                 let fmt = TextFormat::simple(
                     FontId::new(base_size, font_family.clone()),
@@ -120,11 +130,14 @@ fn source_layout(
             }
         }
 
-        let segment_text = &line[seg.raw_start..seg.raw_end];
-        let fmt = segment_format(seg.style, base_size, heading_size, font_family);
-        job.append(segment_text, 0.0, fmt);
+        if seg_start < line.len() {
+            let end = seg_end.min(line.len());
+            let segment_text = &line[seg_start..end];
+            let fmt = segment_format(seg.style, base_size, heading_size, font_family);
+            job.append(segment_text, 0.0, fmt);
+        }
 
-        last_end = seg.raw_end;
+        last_end = seg_end.min(line.len());
     }
 
     if last_end < line.len() {

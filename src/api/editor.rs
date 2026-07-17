@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::editor::state::{EditMode, EditorState};
 
 pub fn set_mode(state: &mut EditorState, mode: EditMode) {

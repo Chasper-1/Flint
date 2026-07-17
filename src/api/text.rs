@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::editor::editor_widget::EditorWidget;
 
 pub fn insert_at_cursor(widget: &mut EditorWidget, text: &str) {

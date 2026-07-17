@@ -27,7 +27,4 @@ pub struct Segment {
 
     pub raw_start: usize,
     pub raw_end: usize,
-
-    pub visible_start: usize,
-    pub visible_end: usize,
 }
