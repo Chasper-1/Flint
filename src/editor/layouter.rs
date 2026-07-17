@@ -1,9 +1,9 @@
-use crate::editor::markup::{SegmentStyle};
 use crate::editor::cache::MarkupCache;
-use eframe::egui::text::{LayoutJob};
-use eframe::egui::{
-    Align, Color32, FontFamily, FontId, Stroke, TextFormat,
+use crate::editor::markup::segment::{
+    STYLE_BOLD, STYLE_CODE, STYLE_ITALIC, STYLE_STRIKETHROUGH, STYLE_SUBSCRIPT, STYLE_SUPERSCRIPT,
 };
+use eframe::egui::text::LayoutJob;
+use eframe::egui::{Align, Color32, FontFamily, FontId, Stroke, TextFormat};
 
 fn append_compensated(
     job: &mut LayoutJob,
@@ -37,80 +37,53 @@ pub fn render_line(
         Color32::from_rgb(180, 180, 180),
     );
 
-    // SOURCE РЕЖИМ → показываем сырой текст
     if show_markup {
         job.append(line, 0.0, default_format);
         return;
     }
 
-    // Заголовок
     if line.starts_with("# ") {
         let content = &line[2..];
-
         let format = TextFormat::simple(FontId::new(heading_size, font_family), Color32::WHITE);
-
         job.append(content, 0.0, format);
         return;
     }
 
-    // Парсим разметку
     for seg in &cache.segments {
-        let format = match seg.style {
-            SegmentStyle::Plain => default_format.clone(),
+        let style = seg.style;
+        let mut format = default_format.clone();
 
-            SegmentStyle::Bold => TextFormat::simple(
-                FontId::new(base_size, font_family.clone()),
-                Color32::from_rgb(255, 100, 100),
-            ),
+        if style & STYLE_BOLD != 0 {
+            format.color = Color32::from_rgb(255, 100, 100);
+        }
 
-            SegmentStyle::Italic => {
-                let mut f = TextFormat::simple(
-                    FontId::new(base_size, font_family.clone()),
-                    Color32::from_rgb(100, 200, 255),
-                );
-                f.italics = true;
-                f
-            }
+        if style & STYLE_ITALIC != 0 {
+            format.color = Color32::from_rgb(100, 200, 255);
+            format.italics = true;
+        }
 
-            SegmentStyle::Strikethrough => {
-                let mut f = TextFormat::simple(
-                    FontId::new(base_size, font_family.clone()),
-                    Color32::from_rgb(200, 150, 150),
-                );
-                f.strikethrough = Stroke::new(1.0, Color32::from_rgb(200, 150, 150));
-                f
-            }
+        if style & STYLE_STRIKETHROUGH != 0 {
+            format.color = Color32::from_rgb(200, 150, 150);
+            format.strikethrough = Stroke::new(1.0, Color32::from_rgb(200, 150, 150));
+        }
 
-            SegmentStyle::Superscript => {
-                let mut f = TextFormat::simple(
-                    FontId::new(base_size * 0.7, font_family.clone()),
-                    Color32::from_rgb(150, 255, 150),
-                );
-                f.valign = Align::TOP;
-                f
-            }
+        if style & STYLE_SUPERSCRIPT != 0 {
+            format.font_id = FontId::new(base_size * 0.7, format.font_id.family);
+            format.color = Color32::from_rgb(150, 255, 150);
+            format.valign = Align::TOP;
+        }
 
-            SegmentStyle::Subscript => {
-                let mut f = TextFormat::simple(
-                    FontId::new(base_size * 0.7, font_family.clone()),
-                    Color32::from_rgb(255, 200, 100),
-                );
-                f.valign = Align::BOTTOM;
-                f
-            }
+        if style & STYLE_SUBSCRIPT != 0 {
+            format.font_id = FontId::new(base_size * 0.7, format.font_id.family);
+            format.color = Color32::from_rgb(255, 200, 100);
+            format.valign = Align::BOTTOM;
+        }
 
-            SegmentStyle::Code => TextFormat::simple(
-                FontId::new(base_size, FontFamily::Monospace),
-                Color32::from_rgb(200, 200, 200),
-            ),
-        };
+        if style & STYLE_CODE != 0 {
+            format.font_id = FontId::new(base_size, FontFamily::Monospace);
+            format.color = Color32::from_rgb(200, 200, 200);
+        }
 
-        append_compensated(
-            job,
-            seg.left_marker_len,
-            &seg.text,
-            seg.right_marker_len,
-            format,
-        );
+        append_compensated(job, seg.left_marker_len, &seg.text, seg.right_marker_len, format);
     }
 }

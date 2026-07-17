@@ -6,6 +6,8 @@ use std::fs;
 
 pub struct FlintApp {
     state: EditorState,
+    content_cache: String,
+    mode_cache: EditMode,
 }
 
 impl FlintApp {
@@ -22,13 +24,24 @@ impl FlintApp {
         visuals.widgets.active.corner_radius = target_radius;
 
         cc.egui_ctx.set_visuals(visuals);
-        Self { state }
+        Self {
+            content_cache: state.content.clone(),
+            mode_cache: state.mode,
+            state,
+        }
+    }
+
+    fn ensure_cache_fresh(&mut self) {
+        if self.state.content != self.content_cache || self.state.mode != self.mode_cache {
+            self.state.document_cache = parse_document(&self.state.content);
+            self.content_cache = self.state.content.clone();
+            self.mode_cache = self.state.mode;
+        }
     }
 }
 
 impl eframe::App for FlintApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        // Панель инструментов
         egui::Panel::top("toolbar").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.state.mode, EditMode::Preview, "👁 Preview");
@@ -45,11 +58,11 @@ impl eframe::App for FlintApp {
                         .id_salt("editor_scroll")
                         .auto_shrink([false; 2])
                         .show(ui, |ui| {
+                            self.ensure_cache_fresh();
+
                             let theme = self.state.theme.clone();
                             let base_size = theme.text.size;
                             let heading_size = base_size * 1.6;
-
-                            self.state.document_cache = parse_document(&self.state.content);
 
                             let font_family = theme
                                 .text
@@ -97,9 +110,8 @@ impl eframe::App for FlintApp {
                                 .text_color(self.state.theme.text.color.to_color32())
                                 .layouter(&mut layouter_func);
 
-                            let output = text_edit.show(ui);
+                            let _output = text_edit.show(ui);
 
-                            // Горячие клавиши
                             ui.ctx().input(|i| {
                                 if i.modifiers.command {
                                     if i.key_pressed(egui::Key::Num1) {

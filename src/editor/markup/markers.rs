@@ -1,10 +1,5 @@
-use super::segment::SegmentStyle;
+use super::segment::{StyleFlags, STYLE_BOLD, STYLE_CODE, STYLE_ITALIC, STYLE_STRIKETHROUGH, STYLE_SUBSCRIPT, STYLE_SUPERSCRIPT};
 
-// TODO(perf):
-// Сейчас используются несколько `find()` для поиска ближайшего маркера.
-// Для текущих объёмов текста этого достаточно, но в будущем стоит заменить
-// на один линейный проход по байтам/символам без повторных поисков.
-// Это уберёт лишние проходы по строке и уменьшит количество сравнений.
 pub const MARKERS: [&str; 7] = [
     "**",
     "~~",
@@ -15,14 +10,14 @@ pub const MARKERS: [&str; 7] = [
     "_",
 ];
 
-pub fn marker_style(marker: &str) -> SegmentStyle {
+pub fn marker_style(marker: &str) -> StyleFlags {
     match marker {
-        "**" => SegmentStyle::Bold,
-        "*" | "_" => SegmentStyle::Italic,
-        "~~" => SegmentStyle::Strikethrough,
-        "^" => SegmentStyle::Superscript,
-        "~" => SegmentStyle::Subscript,
-        "`" => SegmentStyle::Code,
+        "**" => STYLE_BOLD,
+        "*" | "_" => STYLE_ITALIC,
+        "~~" => STYLE_STRIKETHROUGH,
+        "^" => STYLE_SUPERSCRIPT,
+        "~" => STYLE_SUBSCRIPT,
+        "`" => STYLE_CODE,
         _ => unreachable!(),
     }
 }
