@@ -1,9 +1,14 @@
-# Заголовок
-
-Обычный текст с **жирным** и //курсивом// и __подчёркиванием__.
-
-~~Зачёркнутый~~ и ==выделенный== и ++вставка++
-
-,,подстрочный,, и ''надстрочный''
-
-Формула $E=mc^2$ и display $$x^2$$
+**bold**
+//italic//
+__underline__
+~~strikethrough~~
+''superscript''
+,,subscript,,
+==highlight==
+!!spoiler!!
+++insertion++
+--deletion--
+/* comment *\
+$formula$
+$$display formula$$
+!!!spoiler multiline!!!

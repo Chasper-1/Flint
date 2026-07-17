@@ -2,8 +2,8 @@ use crate::editor::cache::DocumentCache;
 use crate::editor::cursor::Cursor;
 use crate::editor::markup::segment::{
     STYLE_BOLD, STYLE_CODE, STYLE_COMMENT, STYLE_DELETION, STYLE_DISPLAY_FORMULA, STYLE_FORMULA,
-    STYLE_HIGHLIGHT, STYLE_INSERTION, STYLE_ITALIC, STYLE_STRIKETHROUGH, STYLE_SUBSCRIPT,
-    STYLE_SUPERSCRIPT, STYLE_UNDERLINE,
+    STYLE_HIGHLIGHT, STYLE_INSERTION, STYLE_ITALIC, STYLE_STRIKETHROUGH,
+    STYLE_SUBSCRIPT, STYLE_SUPERSCRIPT, STYLE_UNDERLINE,
 };
 use crate::editor::state::EditMode;
 use crate::editor::theme::EditorTheme;
@@ -224,7 +224,6 @@ fn segment_format(style: u32, base_size: f32, _heading_size: f32, font_family: &
         format.font_id = FontId::new(base_size * 1.3, FontFamily::Monospace);
         format.color = Color32::from_rgb(80, 220, 120);
     }
-
     format
 }
 
