@@ -49,6 +49,11 @@ pub fn render_line(
         return;
     }
 
+    if cache.segments.is_empty() {
+        job.append(line, 0.0, default_format);
+        return;
+    }
+
     for seg in &cache.segments {
         let style = seg.style;
         let mut format = default_format.clone();

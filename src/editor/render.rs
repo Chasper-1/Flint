@@ -50,8 +50,11 @@ pub fn build(
 
     let mut line_start = 0usize;
     for (i, line) in lines.iter().enumerate() {
-        let is_active = mode == EditMode::LivePreview && i == active_line;
-        let source_mode = mode == EditMode::Source || is_active;
+        let show_markers = match mode {
+            EditMode::Source => true,
+            EditMode::Preview => false,
+            EditMode::LivePreview => i == active_line,
+        };
 
         let job = if line.is_empty() {
             let mut job = LayoutJob::default();
@@ -61,10 +64,8 @@ pub fn build(
             );
             job.append("\u{200B}", 0.0, fmt);
             job
-        } else if source_mode {
-            source_layout(line, line_start, cache.lines.get(i), base_size, heading_size, &font_family)
         } else {
-            preview_layout(line, cache.lines.get(i), base_size, heading_size, &font_family)
+            source_layout(line, line_start, cache.lines.get(i), base_size, heading_size, &font_family, show_markers)
         };
 
         let galley = ui.fonts_mut(|f| f.layout_job(job));
@@ -88,15 +89,18 @@ fn source_layout(
     base_size: f32,
     heading_size: f32,
     font_family: &FontFamily,
+    show_markers: bool,
 ) -> LayoutJob {
     let mut job = LayoutJob::default();
 
     if line.starts_with("# ") {
-        let hash_fmt = TextFormat::simple(
-            FontId::new(heading_size, font_family.clone()),
-            Color32::from_rgb(120, 120, 120),
-        );
-        job.append("# ", 0.0, hash_fmt);
+        if show_markers {
+            let hash_fmt = TextFormat::simple(
+                FontId::new(heading_size, font_family.clone()),
+                Color32::from_rgb(120, 120, 120),
+            );
+            job.append("# ", 0.0, hash_fmt);
+        }
         let content_fmt = TextFormat::simple(
             FontId::new(heading_size, font_family.clone()),
             Color32::WHITE,
@@ -129,7 +133,7 @@ fn source_layout(
         let seg_start = seg.raw_start.saturating_sub(line_start);
         let seg_end = seg.raw_end.saturating_sub(line_start);
 
-        if seg_start > last_end && seg_start <= line.len() {
+        if show_markers && seg_start > last_end && seg_start <= line.len() {
             let marker = &line[last_end..seg_start];
             if !marker.is_empty() {
                 let fmt = TextFormat::simple(
@@ -150,7 +154,7 @@ fn source_layout(
         last_end = seg_end.min(line.len());
     }
 
-    if last_end < line.len() {
+    if show_markers && last_end < line.len() {
         let marker = &line[last_end..];
         if !marker.is_empty() {
             let fmt = TextFormat::simple(
@@ -160,47 +164,6 @@ fn source_layout(
             job.append(marker, 0.0, fmt);
         }
     }
-
-    job
-}
-
-fn preview_layout(
-    line: &str,
-    line_cache: Option<&crate::editor::cache::MarkupCache>,
-    base_size: f32,
-    heading_size: f32,
-    font_family: &FontFamily,
-) -> LayoutJob {
-    let mut job = LayoutJob::default();
-
-    if line.starts_with("# ") {
-        let content = &line[2..];
-        let format = TextFormat::simple(
-            FontId::new(heading_size, font_family.clone()),
-            Color32::WHITE,
-        );
-        job.append(content, 0.0, format);
-        return job;
-    }
-
-    let Some(cache) = line_cache else {
-        let fmt = TextFormat::simple(
-            FontId::new(base_size, font_family.clone()),
-            Color32::from_rgb(180, 180, 180),
-        );
-        job.append(line, 0.0, fmt);
-        return job;
-    };
-
-    crate::editor::layouter::render_line(
-        &mut job,
-        line,
-        cache,
-        base_size,
-        heading_size,
-        font_family.clone(),
-        false,
-    );
 
     job
 }
