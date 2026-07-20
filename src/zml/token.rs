@@ -55,10 +55,7 @@ pub fn tokenize(text: &str) -> Vec<Token> {
                 let search_end = if marker.multiline {
                     len
                 } else {
-                    text[open_end..]
-                        .find('\n')
-                        .map(|p| open_end + p)
-                        .unwrap_or(len)
+                    next_newline(text, open_end).unwrap_or(len)
                 };
 
                 if let Some(close_pos) = find_deep_close(text, open_end..search_end, marker) {
@@ -100,6 +97,24 @@ pub fn tokenize(text: &str) -> Vec<Token> {
 }
 
 // —————— внутренние утилиты ——————
+
+/// Нативный поиск следующего символа `'\n'` начиная с байта `from`.
+///
+/// `'\n'` — ASCII (`0x0A`), поэтому побайтовый проход корректен в UTF-8:
+/// этот байт никогда не встречается внутри многобайтового символа.
+/// Не использует `str::find`, чтобы не создавать подстроку и не считать
+/// относительное смещение (`open_end + p`).
+fn next_newline(text: &str, from: usize) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut i = from;
+    while i < bytes.len() {
+        if bytes[i] == b'\n' {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
 
 /// Находит индекс первого маркера, совпадающего с текущей позицией.
 fn find_any_marker(text: &str, pos: usize) -> Option<usize> {
