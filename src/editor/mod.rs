@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod cursor;
 pub mod editor_widget;
+pub mod font;
 pub mod input;
 pub mod layout;
 pub mod markup;

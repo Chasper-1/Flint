@@ -47,20 +47,23 @@ impl ShapedDocument {
     }
 }
 
-/// Сшейпить все строки документа в один `Buffer`.
+/// Сшейпить строки документа в `Buffer`.
+///
+/// `viewport_height` — если Some, ограничивает шейпинг видимой областью
+/// (cosmic-text не будет формировать строки за её пределами).
 ///
 /// Каждый элемент `line_runs` — список `TextRun` для одной строки.
-/// Склеивает строки через `\n` и отдаёт cosmic-text через `set_rich_text`,
-/// который сам создаёт `BufferLine` и выставляет dirty-флаги.
+/// Склеивает строки через `\n` и отдаёт cosmic-text через `set_rich_text`.
 pub fn shape_document(
     line_runs: &[Vec<TextRun>],
     font_system: &mut cosmic_text::FontSystem,
     base_size: f32,
     default_family: &str,
+    viewport_height: Option<f32>,
 ) -> ShapedDocument {
     let metrics = Metrics::new(base_size, base_size * 1.4);
     let mut buffer = Buffer::new_empty(metrics);
-    buffer.set_size(None, None);
+    buffer.set_size(None, viewport_height);
 
     // 1. Собираем полный текст (склейка строк через \n)
     let mut full_text = String::new();
@@ -122,7 +125,7 @@ pub fn shape_document(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::editor::render::font;
+    use crate::editor::font;
     use crate::editor::theme::color::Rgba;
 
     fn make_runs(text: &str, size: f32) -> Vec<TextRun> {
@@ -133,7 +136,7 @@ mod tests {
     fn shape_single_line() {
         font::init();
         let doc = font::with_font_system(|fs| {
-            shape_document(&[make_runs("hello", 14.0)], fs, 14.0, "sans-serif")
+            shape_document(&[make_runs("hello", 14.0)], fs, 14.0, "sans-serif", None)
         });
         assert!(doc.total_height() > 0.0);
         assert_eq!(doc.line_count(), 1);
@@ -148,6 +151,7 @@ mod tests {
                 fs,
                 14.0,
                 "sans-serif",
+                None,
             )
         });
         assert_eq!(doc.line_count(), 2);
@@ -157,7 +161,7 @@ mod tests {
     fn shape_empty_line() {
         font::init();
         let doc = font::with_font_system(|fs| {
-            shape_document(&[vec![]], fs, 14.0, "sans-serif")
+            shape_document(&[vec![]], fs, 14.0, "sans-serif", None)
         });
         assert_eq!(doc.line_count(), 1);
         assert!(doc.total_height() > 0.0);

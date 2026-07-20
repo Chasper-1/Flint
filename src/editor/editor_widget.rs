@@ -103,6 +103,7 @@ impl EditorWidget {
                 theme,
                 base_size,
                 heading_size,
+                None, // egui не использует viewport-оптимизацию (весь документ)
             );
             self.dirty = false;
         }

@@ -8,7 +8,7 @@
 //!   - Выделение (selection) через fill_quad с фоном
 //!   - Скроллинг
 
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Cell, RefCell};
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer::{self, Renderer as _};
@@ -18,21 +18,33 @@ use iced::{
     Background, Color, Element, Event, Length, Point, Rectangle, Size,
 };
 
+use crate::editor::cache::DocumentCache;
 use crate::editor::cursor::{self, Cursor};
 use crate::editor::layout::cursor_line_bounds;
-use crate::editor::render::ShapedDocument;
+use crate::editor::render::{self, ShapedDocument};
 use crate::editor::state::EditMode;
+use crate::editor::theme::EditorTheme;
 
 // ---------------------------------------------------------------------------
 // Внутреннее состояние
 // ---------------------------------------------------------------------------
 
-/// Состояние редактора, спрятанное за `RefCell`.
+/// Состояние редактора.
+///
+/// Поля-`RefCell` обеспечивают interior mutability — виджет держит
+/// `&EditorInner`, а мутации происходят через `.borrow_mut()` отдельных
+/// полей. `dirty` сигнализирует `draw()`, что `shaped_doc` нужно
+/// перестроить.
 pub struct EditorInner {
     pub content: RefCell<String>,
     pub cursor: RefCell<Cursor>,
-    pub shaped_doc: ShapedDocument,
+    pub shaped_doc: RefCell<ShapedDocument>,
+    pub cache: DocumentCache,
     pub mode: EditMode,
+    pub dirty: Cell<bool>,
+    pub base_size: f32,
+    pub heading_size: f32,
+    pub theme: EditorTheme,
 }
 
 impl EditorInner {
@@ -40,32 +52,29 @@ impl EditorInner {
         Self {
             content: RefCell::new(content),
             cursor: RefCell::new(Cursor::new()),
-            shaped_doc,
+            shaped_doc: RefCell::new(shaped_doc),
+            cache: DocumentCache::default(),
             mode: EditMode::LivePreview,
+            dirty: Cell::new(false),
+            base_size: 14.0,
+            heading_size: 24.0,
+            theme: EditorTheme::default(),
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Виджет (заимствует RefCell)
+// Виджет (держит &EditorInner — interior mutability через RefCell-поля)
 // ---------------------------------------------------------------------------
 
-/// Iced-виджет редактора — заимствует `EditorInner` через `&RefCell`.
+/// Iced-виджет редактора.
 pub struct IcedEditor<'a> {
-    inner: &'a RefCell<EditorInner>,
+    inner: &'a EditorInner,
 }
 
 impl<'a> IcedEditor<'a> {
-    pub fn new(inner: &'a RefCell<EditorInner>) -> Self {
+    pub fn new(inner: &'a EditorInner) -> Self {
         Self { inner }
-    }
-
-    fn borrow(&self) -> Ref<'_, EditorInner> {
-        self.inner.borrow()
-    }
-
-    fn borrow_mut(&self) -> RefMut<'_, EditorInner> {
-        self.inner.borrow_mut()
     }
 }
 
@@ -97,9 +106,39 @@ where
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        let inner = self.borrow();
         let bounds = layout.bounds();
         let origin = Point::new(bounds.x, bounds.y);
+
+        // ── Фаза 1: перешейп (mutable borrow shaped_doc) ──────────────
+        if self.inner.dirty.get() {
+            let content = self.inner.content.borrow();
+            let cache = &self.inner.cache;
+            let cursor_line = self.inner.cursor.borrow().line();
+            let mode = self.inner.mode;
+            let theme = &self.inner.theme;
+            let mut shaped = self.inner.shaped_doc.borrow_mut();
+            render::build(
+                &mut *shaped,
+                &content,
+                cache,
+                mode,
+                cursor_line,
+                theme,
+                self.inner.base_size,
+                self.inner.heading_size,
+                Some(bounds.height),
+            );
+            // shaped, content, cursor_line — dropp'ятся здесь
+            // self.inner.dirty = false; — сделаем ниже в отдельном блоге
+        }
+
+        // Сбрасываем dirty после перешейпа (отдельный блок, чтобы не
+        // пересекаться с borrow_mut shaped_doc).
+        if self.inner.dirty.get() {
+            self.inner.dirty.set(false);
+        }
+
+        // ── Фаза 2: отрисовка ──────────────────────────────────────────
 
         // --- Фон ---
         renderer.fill_quad(
@@ -111,7 +150,8 @@ where
         );
 
         // --- Глифы ---
-        for run in inner.shaped_doc.buffer.layout_runs() {
+        let shaped = self.inner.shaped_doc.borrow();
+        for run in shaped.buffer.layout_runs() {
             for glyph in run.glyphs.iter() {
                 let x = origin.x + glyph.x;
                 let y = origin.y + run.line_y + glyph.y;
@@ -136,9 +176,9 @@ where
         }
 
         // --- Курсор ---
-        let cursor = inner.cursor.borrow();
-        let content = inner.content.borrow();
-        if inner.mode != EditMode::Preview && cursor.should_blink() {
+        let cursor = self.inner.cursor.borrow();
+        let content = self.inner.content.borrow();
+        if self.inner.mode != EditMode::Preview && cursor.should_blink() {
             let (line_start, _) =
                 cursor_line_bounds(&content, cursor.line());
             let byte_in_line =
@@ -148,7 +188,8 @@ where
             let mut cursor_y = 0.0;
             let mut line_h = 12.0;
 
-            for run in inner.shaped_doc.buffer.layout_runs() {
+            // shaped уже borrow'нуто выше — используем его
+            for run in shaped.buffer.layout_runs() {
                 if run.line_i != cursor.line() {
                     continue;
                 }
@@ -220,17 +261,14 @@ where
 
                     use iced::keyboard::key::Named;
 
-                    let editor = self.inner.borrow();
                     match key.as_ref() {
                         iced::keyboard::Key::Named(Named::ArrowLeft) => {
-                            let mut cursor = editor.cursor.borrow_mut();
-                            let c = editor.content.borrow();
-                            cursor.move_left(&c);
+                            let c = self.inner.content.borrow();
+                            self.inner.cursor.borrow_mut().move_left(&c);
                         }
                         iced::keyboard::Key::Named(Named::ArrowRight) => {
-                            let mut cursor = editor.cursor.borrow_mut();
-                            let c = editor.content.borrow();
-                            cursor.move_right(&c);
+                            let c = self.inner.content.borrow();
+                            self.inner.cursor.borrow_mut().move_right(&c);
                         }
                         iced::keyboard::Key::Named(Named::ArrowUp) => {
                             // TODO: move_up
@@ -239,96 +277,66 @@ where
                             // TODO: move_down
                         }
                         iced::keyboard::Key::Named(Named::Home) => {
-                            let mut cursor = editor.cursor.borrow_mut();
-                            let c = editor.content.borrow();
-                            cursor.move_home(&c);
+                            let c = self.inner.content.borrow();
+                            self.inner.cursor.borrow_mut().move_home(&c);
                         }
                         iced::keyboard::Key::Named(Named::End) => {
-                            let mut cursor = editor.cursor.borrow_mut();
-                            let c = editor.content.borrow();
-                            cursor.move_end(&c);
+                            let c = self.inner.content.borrow();
+                            self.inner.cursor.borrow_mut().move_end(&c);
                         }
                         iced::keyboard::Key::Named(Named::Backspace) => {
-                            let raw;
-                            let prev;
-                            {
-                                let cursor = editor.cursor.borrow();
-                                let c = editor.content.borrow();
-                                raw = cursor.raw();
-                                prev = if raw > 0 && !c.is_empty() {
-                                    cursor::prev_grapheme_boundary(&c, raw).unwrap_or(0)
-                                } else {
-                                    raw
-                                };
-                            }
+                            let raw = self.inner.cursor.borrow().raw();
+                            let content = self.inner.content.borrow();
+                            let prev = if raw > 0 && !content.is_empty() {
+                                cursor::prev_grapheme_boundary(&content, raw).unwrap_or(0)
+                            } else {
+                                raw
+                            };
                             if prev != raw {
-                                let mut c = editor.content.borrow_mut();
-                                c.drain(prev..raw);
-                                drop(c);
-                                let mut cursor = editor.cursor.borrow_mut();
-                                let c = editor.content.borrow();
-                                cursor.set_raw(&c, prev);
+                                drop(content);
+                                self.inner.content.borrow_mut().drain(prev..raw);
+                                let c = self.inner.content.borrow();
+                                self.inner.cursor.borrow_mut().set_raw(&c, prev);
+                                self.inner.dirty.set(true);
                             }
                         }
                         iced::keyboard::Key::Named(Named::Delete) => {
-                            let raw;
-                            let next;
-                            {
-                                let cursor = editor.cursor.borrow();
-                                let c = editor.content.borrow();
-                                raw = cursor.raw();
-                                next = if raw < c.len() && !c.is_empty() {
-                                    cursor::next_grapheme_boundary(&c, raw).unwrap_or(c.len())
-                                } else {
-                                    raw
-                                };
-                            }
+                            let raw = self.inner.cursor.borrow().raw();
+                            let content = self.inner.content.borrow();
+                            let next = if raw < content.len() && !content.is_empty() {
+                                cursor::next_grapheme_boundary(&content, raw).unwrap_or(content.len())
+                            } else {
+                                raw
+                            };
                             if next != raw {
-                                let mut c = editor.content.borrow_mut();
-                                c.drain(raw..next);
-                                drop(c);
-                                let mut cursor = editor.cursor.borrow_mut();
-                                let c = editor.content.borrow();
-                                cursor.set_raw(&c, raw);
+                                drop(content);
+                                self.inner.content.borrow_mut().drain(raw..next);
+                                let c = self.inner.content.borrow();
+                                self.inner.cursor.borrow_mut().set_raw(&c, raw);
+                                self.inner.dirty.set(true);
                             }
                         }
                         iced::keyboard::Key::Named(Named::Enter) => {
-                            let raw;
-                            {
-                                let cursor = editor.cursor.borrow();
-                                raw = cursor.raw();
-                            }
-                            {
-                                let mut c = editor.content.borrow_mut();
-                                c.insert(raw, '\n');
-                            }
-                            {
-                                let mut cursor = editor.cursor.borrow_mut();
-                                let c = editor.content.borrow();
-                                cursor.set_raw(&c, raw + 1);
-                                cursor.reset_col_visual();
-                            }
+                            let raw = self.inner.cursor.borrow().raw();
+                            self.inner.content.borrow_mut().insert(raw, '\n');
+                            let c = self.inner.content.borrow();
+                            self.inner.cursor.borrow_mut().set_raw(&c, raw + 1);
+                            self.inner.cursor.borrow_mut().reset_col_visual();
+                            self.inner.dirty.set(true);
                         }
                         _ => {
                             if let Some(text) = text {
                                 if !cmd && !modifiers.alt() {
-                                    let mut raw;
-                                    {
-                                        let cursor = editor.cursor.borrow();
-                                        raw = cursor.raw();
-                                    }
+                                    let mut raw = self.inner.cursor.borrow().raw();
                                     for ch in text.chars() {
                                         if !ch.is_control() {
-                                            let mut c = editor.content.borrow_mut();
-                                            c.insert(raw, ch);
+                                            self.inner.content.borrow_mut().insert(raw, ch);
                                             raw += ch.len_utf8();
                                         }
                                     }
-                                    {
-                                        let mut cursor = editor.cursor.borrow_mut();
-                                        let c = editor.content.borrow();
-                                        cursor.set_raw(&c, raw);
-                                    }
+                                    let c = self.inner.content.borrow();
+                                    self.inner.cursor.borrow_mut().set_raw(&c, raw);
+                                    self.inner.dirty.set(true);
                                 }
                             }
                         }
@@ -346,12 +354,12 @@ where
                         let local_x = pos.x - origin.x;
                         let local_y = pos.y - origin.y;
 
-                        let editor = self.inner.borrow();
+                        let shaped = self.inner.shaped_doc.borrow();
                         let cosmic_cursor =
-                            editor.shaped_doc.buffer.hit(local_x, local_y);
+                            shaped.buffer.hit(local_x, local_y);
 
                         if let Some(cosmic) = cosmic_cursor {
-                            let content = editor.content.borrow();
+                            let content = self.inner.content.borrow();
                             let (line_start, _) = cursor_line_bounds(
                                 &content,
                                 cosmic.line,
@@ -359,8 +367,8 @@ where
                             let new_raw =
                                 (line_start + cosmic.index).min(content.len());
                             drop(content);
-                            let mut cursor = editor.cursor.borrow_mut();
-                            let c = editor.content.borrow();
+                            let c = self.inner.content.borrow();
+                            let mut cursor = self.inner.cursor.borrow_mut();
                             cursor.set_raw(&c, new_raw);
                             cursor.set_line(cosmic.line);
                             cursor.reset_col_visual();
@@ -412,7 +420,7 @@ fn delete_after(content: &mut String, cursor: &mut Cursor) {
 
 /// Создать `Element` с редактором.
 pub fn editor_element<'a, Message: 'a>(
-    inner: &'a RefCell<EditorInner>,
+    inner: &'a EditorInner,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     Element::new(IcedEditor::new(inner))
 }

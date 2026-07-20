@@ -2,8 +2,6 @@
 //!
 //! Постепенно заменяет egui-версию в `app.rs` / `run.rs`.
 
-use std::cell::RefCell;
-
 use iced::widget::{container, scrollable};
 use iced::{Element, Task, Theme};
 
@@ -18,7 +16,7 @@ pub enum Message {
 
 /// Состояние приложения.
 struct AppState {
-    inner: RefCell<EditorInner>,
+    inner: EditorInner,
 }
 
 fn boot() -> (AppState, Task<Message>) {
@@ -27,7 +25,7 @@ fn boot() -> (AppState, Task<Message>) {
     let shaped_doc = ShapedDocument::new(empty_buffer);
 
     let app = AppState {
-        inner: RefCell::new(EditorInner::new(String::new(), shaped_doc)),
+        inner: EditorInner::new(String::new(), shaped_doc),
     };
     (app, Task::none())
 }

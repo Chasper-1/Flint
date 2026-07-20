@@ -1,6 +1,6 @@
 [package]
-name = "Flint"
-version = "0.2.2"
+name = "Zol"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]

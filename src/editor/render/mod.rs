@@ -1,4 +1,3 @@
-pub mod font;
 pub mod painter;
 pub mod shape;
 
@@ -12,7 +11,10 @@ pub use painter::{click_position, paint};
 
 /// Собрать документ: вычислить TextRun'ы → сшейпить → готово к отрисовке.
 ///
-/// Вызывает `font::init()` при первом вызове.
+/// `viewport_height` — если Some, cosmic-text посчитает только строки,
+/// помещающиеся в эту высоту (остальные не будут сформованы).
+///
+/// Вызывает `crate::editor::font::init()` при первом вызове.
 pub fn build(
     doc: &mut ShapedDocument,
     content: &str,
@@ -22,8 +24,9 @@ pub fn build(
     theme: &EditorTheme,
     base_size: f32,
     heading_size: f32,
+    viewport_height: Option<f32>,
 ) {
-    font::init(); // гарантируем инициализацию FontSystem
+    crate::editor::font::init();
 
     let font_family = theme.text.font_family.as_deref().unwrap_or("sans-serif");
 
@@ -58,8 +61,13 @@ pub fn build(
         }
     }
 
-    font::with_font_system(|fs| {
-        let shaped = shape::shape_document(&all_runs, fs, base_size, font_family);
-        *doc = shaped;
+    crate::editor::font::with_font_system(|fs| {
+        *doc = shape::shape_document(
+            &all_runs,
+            fs,
+            base_size,
+            font_family,
+            viewport_height,
+        );
     });
 }
