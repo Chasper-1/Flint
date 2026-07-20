@@ -1,5 +1,5 @@
 use crate::editor::cursor::Cursor;
-use super::layout::cursor_line_bounds;
+use crate::editor::layout::cursor_line_bounds;
 use crate::editor::state::EditMode;
 use crate::editor::utils::line_utils;
 use super::Galleys;

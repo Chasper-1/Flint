@@ -2,6 +2,7 @@ pub mod cache;
 pub mod cursor;
 pub mod editor_widget;
 pub mod input;
+pub mod layout;
 pub mod markup;
 pub mod render;
 pub mod state;
