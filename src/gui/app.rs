@@ -1,6 +1,16 @@
 use crate::editor::editor_widget::EditorWidget;
 use crate::editor::state::{EditMode, EditorState};
+use crate::editor::theme::Rgba;
 use eframe::egui;
+
+fn rgba_to_color32(c: &Rgba) -> egui::Color32 {
+    egui::Color32::from_rgba_unmultiplied(
+        (c.r * 255.0) as u8,
+        (c.g * 255.0) as u8,
+        (c.b * 255.0) as u8,
+        (c.a * 255.0) as u8,
+    )
+}
 
 pub struct FlintApp {
     state: EditorState,
@@ -11,7 +21,7 @@ pub struct FlintApp {
 impl FlintApp {
     pub fn new(cc: &eframe::CreationContext<'_>, state: EditorState) -> Self {
         let mut visuals = egui::Visuals::dark();
-        visuals.panel_fill = state.theme.background.to_color32();
+        visuals.panel_fill = rgba_to_color32(&state.theme.background);
 
         let radius_u8 = state.theme.radius.round() as u8;
         let target_radius = egui::CornerRadius::same(radius_u8);
