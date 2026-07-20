@@ -78,12 +78,8 @@ impl Cursor {
         if self.raw == 0 {
             return;
         }
-        let mut gc = GraphemeCursor::new(self.raw, content.len(), true);
-        if let Ok(Some(prev)) = gc.prev_boundary(content, 0) {
-            self.raw = prev;
-        } else {
-            self.raw = 0;
-        }
+        let prev = prev_grapheme_boundary(content, self.raw).unwrap_or(0);
+        self.raw = prev;
         self.line = line_utils::line_of_byte(content, self.raw);
         self.force_blink();
     }
@@ -93,11 +89,7 @@ impl Cursor {
         if self.raw >= content.len() {
             return;
         }
-        let mut gc = GraphemeCursor::new(self.raw, content.len(), true);
-        match gc.next_boundary(content, 0) {
-            Ok(Some(next)) => self.raw = next,
-            _ => self.raw = content.len(),
-        }
+        self.raw = next_grapheme_boundary(content, self.raw).unwrap_or(content.len());
         self.line = line_utils::line_of_byte(content, self.raw);
         self.force_blink();
     }
