@@ -1,4 +1,5 @@
 use super::*;
+use crate::zoll as zoll_core;
 
 #[test]
 fn zoll_tokenize_plain_text() {

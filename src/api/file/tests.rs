@@ -1,4 +1,5 @@
 use std::io::Read;
+use crate::document::Document;
 use super::*;
 
 #[test]

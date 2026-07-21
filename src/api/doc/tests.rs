@@ -1,4 +1,5 @@
 use super::*;
+use crate::document::Document;
 
 #[test]
 fn doc_create_with_text() {

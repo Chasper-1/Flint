@@ -1,4 +1,4 @@
-use crate::editor::state::EditorState;
+use crate::editor::state::{EditMode, EditorState};
 use crate::editor::theme::EditorTheme;
 use super::*;
 
