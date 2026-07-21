@@ -17,6 +17,8 @@ pub struct TextTheme {
 /// Тема редактора — снимок всех настроек для быстрого доступа.
 #[derive(Debug, Clone)]
 pub struct EditorTheme {
+    /// Название темы (для идентификации в конфигах).
+    pub name: String,
     pub padding: f32,
     pub radius: f32,
     pub background: Rgba,
@@ -26,6 +28,7 @@ pub struct EditorTheme {
 impl Default for EditorTheme {
     fn default() -> Self {
         Self {
+            name: String::from("default"),
             padding: 10.0,
             radius: 16.0,
             background: Rgba::new(0.153, 0.18, 0.2).with_alpha(0.9),

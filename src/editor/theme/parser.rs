@@ -59,6 +59,7 @@ pub fn parse_theme(rhai: Map) -> EditorTheme {
     }
 
     EditorTheme {
+        name: String::from("custom"),
         padding,
         radius,
         background,
