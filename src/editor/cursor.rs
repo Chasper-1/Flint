@@ -131,7 +131,12 @@ impl Cursor {
     /// 530ms видим, 530ms скрыт, повтор. `force_blink()` сбрасывает в начало
     /// видимой фазы.
     pub fn should_blink(&self) -> bool {
-        let elapsed = Instant::now().duration_since(self.last_blink);
+        self.should_blink_at(Instant::now())
+    }
+
+    /// То же что [`should_blink`], но с явным моментом времени (для тестов).
+    pub(crate) fn should_blink_at(&self, now: Instant) -> bool {
+        let elapsed = now.duration_since(self.last_blink);
         let period = 1060; // полный цикл в ms
         let phase = elapsed.as_millis() % period;
         phase < 530
@@ -140,6 +145,12 @@ impl Cursor {
     /// Сбросить таймер мигания (курсор видим после действий).
     pub fn force_blink(&mut self) {
         self.last_blink = Instant::now();
+    }
+
+    /// Сбросить таймер на указанный момент (для тестов).
+    #[cfg(test)]
+    pub(crate) fn force_blink_at(&mut self, now: Instant) {
+        self.last_blink = now;
     }
 }
 
@@ -533,10 +544,41 @@ mod tests {
     #[test]
     fn force_blink_resets_to_visible() {
         let mut c = Cursor::new();
-        // после паузы курсор должен быть visible (phase 0)
         assert!(c.should_blink());
         c.force_blink();
         assert!(c.should_blink(), "force_blink should reset to visible phase");
+    }
+
+    #[test]
+    fn blink_phase_hidden_after_600ms() {
+        let c = Cursor::new();
+        let start = c.last_blink;
+        // 600ms спустя — фаза должна быть в hidden-половине (530…1060)
+        let later = start + Duration::from_millis(600);
+        assert!(!c.should_blink_at(later), "cursor should be hidden at 600ms");
+    }
+
+    #[test]
+    fn blink_phase_visible_after_1100ms() {
+        let c = Cursor::new();
+        let start = c.last_blink;
+        // 1100ms спустя — следующая visible-фаза (1060…1590)
+        let later = start + Duration::from_millis(1100);
+        assert!(c.should_blink_at(later), "cursor should be visible at 1100ms (next cycle)");
+    }
+
+    #[test]
+    fn blink_phase_respects_force_blink_reset() {
+        let mut c = Cursor::new();
+        let start = c.last_blink;
+        let later = start + Duration::from_millis(600);
+        // принудительно сбросили в later
+        c.force_blink_at(later);
+        // сразу после сброса — visible
+        assert!(c.should_blink_at(later), "force_blink should reset to visible at that time");
+        // 600ms после сброса — hidden
+        let later2 = later + Duration::from_millis(600);
+        assert!(!c.should_blink_at(later2), "600ms after force_blink should be hidden");
     }
 
     // ------------------------------------------------------------------

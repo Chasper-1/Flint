@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use iced::widget::container;
 use iced::{Element, Subscription, Task, Theme};
-use iced_futures::backend::default::time::every;
 
 use crate::gui::iced_editor::{editor_element, EditorInner};
 
@@ -31,15 +30,15 @@ fn boot() -> (AppState, Task<Message>) {
     (app, Task::none())
 }
 
-fn update(app_state: &mut AppState, message: Message) {
+fn update(_app_state: &mut AppState, message: Message) -> Task<Message> {
     match message {
-        Message::Tick => {
-            // force_blink сбрасывает таймер, чтобы should_blink()
-            // пересчитал фазу относительно текущего времени.
-            let mut cursor = app_state.inner.cursor.borrow_mut();
-            cursor.force_blink();
-        }
+        // Tick нужен только чтобы Iced вызвал view → draw.
+        // should_blink() сам определяет фазу по Instant::now(),
+        // force_blink НЕ вызываем — он сбросит фазу и курсор
+        // никогда не погаснет.
+        Message::Tick => {}
     }
+    Task::none()
 }
 
 fn subscription(_app_state: &AppState) -> Subscription<Message> {
