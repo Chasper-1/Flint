@@ -27,6 +27,7 @@ use crate::editor::render;
 use crate::editor::state::EditMode;
 
 use super::inner::EditorInner;
+use super::scroll::ensure_cursor_visible;
 
 // ---------------------------------------------------------------------------
 // Виджет (держит &EditorInner — interior mutability через RefCell-поля)
@@ -346,6 +347,20 @@ where
                         }
                     }
 
+                    // Автоскролл: подтягиваем scroll_y чтобы курсор был виден
+                    {
+                        let cursor_line = self.inner.cursor.borrow().line();
+                        let new_scroll_y = ensure_cursor_visible(
+                            self.inner.scroll_y.get(),
+                            bounds.height,
+                            &self.inner.shaped_doc.borrow(),
+                            cursor_line,
+                        );
+                        if (new_scroll_y - self.inner.scroll_y.get()).abs() > 0.5 {
+                            self.inner.scroll_y.set(new_scroll_y);
+                            self.inner.dirty.set(true);
+                        }
+                    }
                     shell.request_redraw();
                 }
             }
@@ -371,8 +386,23 @@ where
                             cursor.set_raw(&c, new_raw);
                             cursor.set_line(cosmic.line);
                             cursor.reset_col_visual();
-                            shell.request_redraw();
                         }
+
+                        // Автоскролл после клика
+                        {
+                            let cursor_line = self.inner.cursor.borrow().line();
+                            let new_scroll_y = ensure_cursor_visible(
+                                self.inner.scroll_y.get(),
+                                bounds.height,
+                                &self.inner.shaped_doc.borrow(),
+                                cursor_line,
+                            );
+                            if (new_scroll_y - self.inner.scroll_y.get()).abs() > 0.5 {
+                                self.inner.scroll_y.set(new_scroll_y);
+                                self.inner.dirty.set(true);
+                            }
+                        }
+                        shell.request_redraw();
                     }
                 }
             }

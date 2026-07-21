@@ -90,4 +90,5 @@ pub fn move_vertical(inner: &EditorInner, target_line: usize) {
     let mut cursor = inner.cursor.borrow_mut();
     cursor.set_raw(&c, new_raw);
     cursor.set_col_visual(x);
+    inner.dirty.set(true);
 }
