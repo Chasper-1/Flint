@@ -1,4 +1,3 @@
-pub mod painter;
 pub mod shape;
 
 use crate::editor::cache::DocumentCache;
@@ -7,12 +6,13 @@ use crate::editor::state::EditMode;
 use crate::editor::theme::EditorTheme;
 
 pub use shape::ShapedDocument;
-pub use painter::{click_position, paint};
 
 /// Собрать документ: вычислить TextRun'ы → сшейпить → готово к отрисовке.
 ///
-/// `viewport_height` — если Some, cosmic-text посчитает только строки,
-/// помещающиеся в эту высоту (остальные не будут сформованы).
+/// `scroll_y` — вертикальный сдвиг прокрутки (пиксели). cosmic-text
+/// сформирует только видимое окно `[scroll_y, scroll_y + viewport_height]`.
+///
+/// `viewport_height` — если Some, ограничивает шейпинг видимой областью.
 ///
 /// Вызывает `crate::editor::font::init()` при первом вызове.
 pub fn build(
@@ -24,6 +24,7 @@ pub fn build(
     theme: &EditorTheme,
     base_size: f32,
     heading_size: f32,
+    scroll_y: f32,
     viewport_height: Option<f32>,
 ) {
     crate::editor::font::init();
@@ -51,6 +52,7 @@ pub fn build(
                 base_size,
                 heading_size,
                 show_markers,
+                theme,
             )
         };
 
@@ -67,6 +69,7 @@ pub fn build(
             fs,
             base_size,
             font_family,
+            scroll_y,
             viewport_height,
         );
     });

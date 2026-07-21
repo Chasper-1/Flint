@@ -5,9 +5,10 @@
 //!
 //! От GUI не зависит. Для отрисовки используйте `painter.rs`.
 
-use cosmic_text::{Align, Attrs, Buffer, Metrics, Shaping};
+use cosmic_text::{Align, Attrs, Buffer, Color as CosmicColor, Metrics, Scroll, Shaping};
 
 use crate::editor::layout::TextRun;
+use crate::editor::theme::color::Rgba;
 
 /// Сформованный документ — обёртка над cosmic-text `Buffer`.
 ///
@@ -49,6 +50,10 @@ impl ShapedDocument {
 
 /// Сшейпить строки документа в `Buffer`.
 ///
+/// `scroll_y` — вертикальный сдвиг прокрутки (в пикселях). cosmic-text
+/// сформирует только строки, попадающие в видимое окно
+/// `[scroll_y, scroll_y + viewport_height]`.
+///
 /// `viewport_height` — если Some, ограничивает шейпинг видимой областью
 /// (cosmic-text не будет формировать строки за её пределами).
 ///
@@ -59,6 +64,7 @@ pub fn shape_document(
     font_system: &mut cosmic_text::FontSystem,
     base_size: f32,
     default_family: &str,
+    scroll_y: f32,
     viewport_height: Option<f32>,
 ) -> ShapedDocument {
     let metrics = Metrics::new(base_size, base_size * 1.4);
@@ -102,7 +108,8 @@ pub fn shape_document(
                 let family = run.font_family.as_deref().unwrap_or(default_family);
                 let attrs = Attrs::new()
                     .metrics(Metrics::new(run.size, metrics.line_height))
-                    .family(cosmic_text::Family::Name(family));
+                    .family(cosmic_text::Family::Name(family))
+                    .color(rgba_to_cosmic(&run.color));
                 let end = offset + run.text.len();
                 let span_text = &full_text[offset..end];
                 spans.push((span_text, attrs));
@@ -118,8 +125,19 @@ pub fn shape_document(
     }
 
     buffer.set_rich_text(spans, &default_attrs, Shaping::Advanced, Some(Align::Left));
-    buffer.shape_until_scroll(font_system, true);
+    buffer.set_scroll(Scroll::new(0, scroll_y, 0.0));
+    buffer.shape_until_scroll(font_system, false);
     ShapedDocument::new(buffer)
+}
+
+/// Перевести [`Rgba`] редактора в цвет cosmic-text.
+fn rgba_to_cosmic(c: &Rgba) -> CosmicColor {
+    CosmicColor::rgba(
+        (c.r * 255.0) as u8,
+        (c.g * 255.0) as u8,
+        (c.b * 255.0) as u8,
+        (c.a * 255.0) as u8,
+    )
 }
 
 #[cfg(test)]
@@ -136,7 +154,7 @@ mod tests {
     fn shape_single_line() {
         font::init();
         let doc = font::with_font_system(|fs| {
-            shape_document(&[make_runs("hello", 14.0)], fs, 14.0, "sans-serif", None)
+            shape_document(&[make_runs("hello", 14.0)], fs, 14.0, "sans-serif", 0.0, None)
         });
         assert!(doc.total_height() > 0.0);
         assert_eq!(doc.line_count(), 1);
@@ -151,6 +169,7 @@ mod tests {
                 fs,
                 14.0,
                 "sans-serif",
+                0.0,
                 None,
             )
         });
@@ -161,7 +180,7 @@ mod tests {
     fn shape_empty_line() {
         font::init();
         let doc = font::with_font_system(|fs| {
-            shape_document(&[vec![]], fs, 14.0, "sans-serif", None)
+            shape_document(&[vec![]], fs, 14.0, "sans-serif", 0.0, None)
         });
         assert_eq!(doc.line_count(), 1);
         assert!(doc.total_height() > 0.0);

@@ -75,6 +75,23 @@ where
     f(&mut guard.swash_cache)
 }
 
+/// Доступ к `FontSystem` и `SwashCache` одновременно.
+///
+/// Нужен для растеризации глифов: `buffer.draw()` требует оба ресурса
+/// сразу, а вложенный вызов `with_font_system` + `with_swash_cache`
+/// привёл бы к взаимной блокировке одного и того же `Mutex`.
+pub fn with_font_and_cache<F, T>(f: F) -> T
+where
+    F: FnOnce(&mut cosmic_text::FontSystem, &mut cosmic_text::SwashCache) -> T,
+{
+    let lock = GLOBAL
+        .get()
+        .expect("font::init() must be called before with_font_and_cache()");
+    let mut guard = lock.lock().unwrap_or_else(PoisonError::into_inner);
+    let FontGlobal { font_system, swash_cache } = &mut *guard;
+    f(font_system, swash_cache)
+}
+
 /// Список всех доступных семейств шрифтов (системные + встроенные).
 pub fn list_families() -> Vec<String> {
     let lock = GLOBAL

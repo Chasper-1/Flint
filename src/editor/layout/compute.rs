@@ -11,6 +11,7 @@ use crate::editor::markup::segment::{
     STYLE_SUPERSCRIPT, STYLE_UNDERLINE,
 };
 use crate::editor::theme::color::Rgba;
+use crate::editor::theme::EditorTheme;
 use crate::editor::utils::line_utils;
 
 /// Разобрать строку на стилизованные фрагменты.
@@ -25,6 +26,7 @@ pub fn compute_line_runs(
     base_size: f32,
     heading_size: f32,
     show_markers: bool,
+    theme: &EditorTheme,
 ) -> Vec<TextRun> {
     // Заголовок (#)
     if let Some(stripped) = line.strip_prefix("# ") {
@@ -36,13 +38,13 @@ pub fn compute_line_runs(
         return runs;
     }
 
-    // Нет кэша или нет сегментов — вся строка plain
+    // Нет кэша или нет сегментов — вся строка plain (цвет из темы)
     let Some(cache) = line_cache else {
-        return vec![TextRun::new(line, 0, shared::TEXT_DEFAULT, base_size)];
+        return vec![TextRun::new(line, 0, theme.text.color, base_size)];
     };
 
     if cache.segments.is_empty() {
-        return vec![TextRun::new(line, 0, shared::TEXT_DEFAULT, base_size)];
+        return vec![TextRun::new(line, 0, theme.text.color, base_size)];
     }
 
     let mut runs = Vec::new();
@@ -185,7 +187,7 @@ mod tests {
 
     #[test]
     fn plain_line_no_cache() {
-        let runs = compute_line_runs("hello", 0, None, 14.0, 22.0, false);
+        let runs = compute_line_runs("hello", 0, None, 14.0, 22.0, false, &EditorTheme::default());
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text, "hello");
         assert_eq!(runs[0].size, 14.0);
@@ -193,7 +195,7 @@ mod tests {
 
     #[test]
     fn heading_no_markers() {
-        let runs = compute_line_runs("# hi", 0, None, 14.0, 22.0, false);
+        let runs = compute_line_runs("# hi", 0, None, 14.0, 22.0, false, &EditorTheme::default());
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text, "hi");
         assert_eq!(runs[0].size, 22.0);
@@ -201,7 +203,7 @@ mod tests {
 
     #[test]
     fn heading_with_markers() {
-        let runs = compute_line_runs("# hi", 0, None, 14.0, 22.0, true);
+        let runs = compute_line_runs("# hi", 0, None, 14.0, 22.0, true, &EditorTheme::default());
         assert_eq!(runs.len(), 2);
         assert_eq!(runs[0].text, "# ");
         assert_eq!(runs[0].size, 22.0);
@@ -212,7 +214,15 @@ mod tests {
     fn bold_segment_with_markers() {
         // "a **b** c" — байты: a=0, ' '=1, '*=2, '*=3, b=4, '*=5, '*=6, ' '=7, c=8
         let seg = seg(STYLE_BOLD, 2, 8);
-        let runs = compute_line_runs("a **b** c", 0, Some(&cache(vec![seg])), 14.0, 22.0, true);
+        let runs = compute_line_runs(
+            "a **b** c",
+            0,
+            Some(&cache(vec![seg])),
+            14.0,
+            22.0,
+            true,
+            &EditorTheme::default(),
+        );
         assert_eq!(runs.len(), 3);
         assert_eq!(runs[0].text, "a "); // маркер (plain text) до сегмента
         assert_eq!(runs[1].text, "**b** "); // сегмент: **b** + пробел (raw 2..8)
@@ -222,7 +232,15 @@ mod tests {
     #[test]
     fn bold_segment_no_markers() {
         let seg = seg(STYLE_BOLD, 2, 8);
-        let runs = compute_line_runs("a **b** c", 0, Some(&cache(vec![seg])), 14.0, 22.0, false);
+        let runs = compute_line_runs(
+            "a **b** c",
+            0,
+            Some(&cache(vec![seg])),
+            14.0,
+            22.0,
+            false,
+            &EditorTheme::default(),
+        );
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].text, "**b** "); // только сегмент, маркеры скрыты
     }

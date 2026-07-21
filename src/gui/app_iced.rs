@@ -2,10 +2,9 @@
 //!
 //! Постепенно заменяет egui-версию в `app.rs` / `run.rs`.
 
-use iced::widget::{container, scrollable};
+use iced::widget::container;
 use iced::{Element, Task, Theme};
 
-use crate::editor::render::ShapedDocument;
 use crate::gui::iced_editor::{editor_element, EditorInner};
 
 /// Сообщения приложения.
@@ -20,12 +19,11 @@ struct AppState {
 }
 
 fn boot() -> (AppState, Task<Message>) {
-    let metrics = cosmic_text::Metrics::new(14.0, 19.6);
-    let empty_buffer = cosmic_text::Buffer::new_empty(metrics);
-    let shaped_doc = ShapedDocument::new(empty_buffer);
+    // Загружаем содержимое заметки (или пусто, если файла нет).
+    let content = std::fs::read_to_string("notes.zml").unwrap_or_default();
 
     let app = AppState {
-        inner: EditorInner::new(String::new(), shaped_doc),
+        inner: EditorInner::new(content),
     };
     (app, Task::none())
 }
@@ -37,7 +35,7 @@ fn update(_app_state: &mut AppState, _message: Message) {
 fn view(app_state: &AppState) -> Element<'_, Message, Theme, iced::Renderer> {
     let editor = editor_element(&app_state.inner);
 
-    container(scrollable(container(editor)))
+    container(editor)
         .width(iced::Length::Fill)
         .height(iced::Length::Fill)
         .into()
