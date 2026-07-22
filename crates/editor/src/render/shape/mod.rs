@@ -8,7 +8,6 @@ use crate::layout::TextRun;
 use crate::markup::segment::{
     STYLE_BOLD, STYLE_ITALIC, STYLE_STRIKETHROUGH, STYLE_UNDERLINE,
 };
-use crate::theme::color::Rgba;
 
 /// Сшейпить строки документа в Buffer.
 pub fn shape_document(
@@ -92,7 +91,7 @@ pub fn shape_document(
     ShapedDocument::new(buffer, line_runs.to_vec())
 }
 
-fn rgba_to_cosmic(c: &Rgba) -> CosmicColor {
+fn rgba_to_cosmic(c: &crate::theme::color::Rgba) -> CosmicColor {
     CosmicColor::rgba(
         (c.r * 255.0) as u8,
         (c.g * 255.0) as u8,

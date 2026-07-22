@@ -1,16 +1,5 @@
-use super::style::MarkupStyle;
-
-/// Определение маркера разметки.
-#[derive(Debug, Clone)]
-pub struct MarkerDef {
-    pub open: &'static str,
-    pub close: &'static str,
-    pub style: MarkupStyle,
-    pub multiline: bool,
-    /// Отслеживать вложенность одноимённых маркеров.
-    /// `false` для комментариев — первый же `%%` закрывает.
-    pub track_depth: bool,
-}
+use crate::ast::markers::def::MarkerDef;
+use crate::ast::style::MarkupStyle;
 
 /// Все маркеры zoll. Упорядочены от длинных к коротким для правильного приоритета.
 pub const MARKERS: &[MarkerDef] = &[
