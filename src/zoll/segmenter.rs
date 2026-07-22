@@ -85,14 +85,19 @@ fn build_segments(
                 raw_offset += text.len();
             }
             MarkupNode::Formatted { style, children } => {
-                // Открывающий маркер
                 let combined = combine_style(inherited_style, *style);
                 let marker_len = marker_open_len(*style);
 
-                // Рекурсивно обрабатываем детей
+                // Пропускаем открывающий маркер
+                raw_offset += marker_len;
                 let child_start = raw_offset;
-                let child_end = build_segments(children, combined, segments, raw_offset);
-                raw_offset = child_end;
+
+                // Рекурсивно обрабатываем детей (они получают корректный raw_offset)
+                raw_offset = build_segments(children, combined, segments, raw_offset);
+
+                // Пропускаем закрывающий маркер
+                let child_end = raw_offset;
+                raw_offset += marker_len;
 
                 // Помечаем первый и последний сегмент маркерами
                 if let Some(first) = segments
@@ -102,8 +107,6 @@ fn build_segments(
                 {
                     first.left_marker_len += marker_len;
                 }
-                // Эта логика не совсем точная, нужен более аккуратный подход.
-                // Пока что маркеры будут обрабатываться на уровне raw текст.
             }
         }
     }

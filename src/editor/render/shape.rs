@@ -5,9 +5,10 @@
 //!
 //! От GUI не зависит. Для отрисовки используйте `painter.rs`.
 
-use cosmic_text::{Align, Attrs, Buffer, Color as CosmicColor, Metrics, Scroll, Shaping};
+use cosmic_text::{Align, Attrs, Buffer, Color as CosmicColor, Metrics, Scroll, Shaping, Style, UnderlineStyle, Weight};
 
 use crate::editor::layout::TextRun;
+use crate::editor::markup::segment::{STYLE_BOLD, STYLE_ITALIC, STYLE_STRIKETHROUGH, STYLE_UNDERLINE};
 use crate::editor::theme::color::Rgba;
 
 /// Сформованный документ — обёртка над cosmic-text `Buffer`.
@@ -106,10 +107,23 @@ pub fn shape_document(
         } else {
             for run in runs {
                 let family = run.font_family.as_deref().unwrap_or(default_family);
-                let attrs = Attrs::new()
+                let mut attrs = Attrs::new()
                     .metrics(Metrics::new(run.size, metrics.line_height))
                     .family(cosmic_text::Family::Name(family))
                     .color(rgba_to_cosmic(&run.color));
+
+                if run.style_flags & STYLE_BOLD != 0 {
+                    attrs = attrs.weight(Weight::BOLD);
+                }
+                if run.style_flags & STYLE_ITALIC != 0 {
+                    attrs = attrs.style(Style::Italic);
+                }
+                if run.style_flags & STYLE_STRIKETHROUGH != 0 {
+                    attrs = attrs.strikethrough();
+                }
+                if run.style_flags & STYLE_UNDERLINE != 0 {
+                    attrs = attrs.underline(UnderlineStyle::Single);
+                }
                 let end = offset + run.text.len();
                 let span_text = &full_text[offset..end];
                 spans.push((span_text, attrs));
